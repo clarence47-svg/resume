@@ -1,0 +1,55 @@
+name: profile-agent
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: profile_agent
+      POSTGRES_USER: profile_agent
+      POSTGRES_PASSWORD: profile_agent
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U profile_agent -d profile_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  agent_service:
+    image: profile-agent-service:local
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://profile_agent:profile_agent@postgres:5432/profile_agent
+      CHECKPOINT_URL: postgresql://profile_agent:profile_agent@postgres:5432/profile_agent
+      DATA_DIR: /app/data
+      SERVICE_HOST: 0.0.0.0
+      SERVICE_PORT: 8080
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      PROFILE_MODEL: ${PROFILE_MODEL:-gpt-4.1-mini}
+      MATCH_MODEL: ${MATCH_MODEL:-}
+      MATCH_WORKERS: ${MATCH_WORKERS:-1}
+      ALLOW_HEURISTIC_FALLBACK: ${ALLOW_HEURISTIC_FALLBACK:-true}
+    volumes:
+      - profile_data:/app/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  streamlit_app:
+    image: profile-agent-service:local
+    command: [".venv/bin/streamlit", "run", "src/streamlit_app.py", "--server.address=0.0.0.0"]
+    environment:
+      AGENT_URL: http://agent_service:8080
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      - agent_service
+
+volumes:
+  postgres_data:
+  profile_data:

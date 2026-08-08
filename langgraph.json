@@ -1,0 +1,8 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "profile-agent": "./src/agents/profile_agent/graph.py:graph",
+    "jd-match-agent": "./src/agents/jd_match_agent/graph.py:graph"
+  },
+  "env": ".env"
+}
