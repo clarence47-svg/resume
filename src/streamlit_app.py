@@ -230,8 +230,9 @@ def inject_theme() -> None:
         .section-heading h3 { margin: 0; font-size: 1.05rem; letter-spacing: -.015em; }
         .section-heading p { margin: .2rem 0 0; color: var(--muted); font-size: .78rem; }
         .metric-card {
-            min-height: 106px; padding: 1.05rem 1.12rem; border-radius: 17px;
+            height: 150px; box-sizing: border-box; padding: 1.05rem 1.12rem; border-radius: 17px;
             background: white; border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(32,42,73,.055);
+            display: flex; flex-direction: column; justify-content: center;
         }
         .metric-label { color: #7b8497; font-size: .72rem; font-weight: 650; letter-spacing: .03em; }
         .metric-value { color: #1d2639; font-size: 1.65rem; font-weight: 780; letter-spacing: -.035em; margin: .28rem 0 .1rem; }
@@ -288,8 +289,71 @@ def inject_theme() -> None:
         .chip.gray { background: #f1f3f6; color: #606a7c; border-color: #e4e7ec; }
         .empty-hint { padding: 1.4rem; text-align: center; color: #8790a0; background: #fafbfc; border: 1px dashed #dce0e8; border-radius: 14px; }
         [data-testid="stVerticalBlockBorderWrapper"] {
-            background: rgba(255,255,255,.96); border-color: var(--line) !important;
+            background: #fff; border-color: var(--line) !important;
             border-radius: 17px !important; box-shadow: 0 8px 28px rgba(32,42,73,.045);
+        }
+        [data-testid="stForm"] {
+            background: #fff; border-color: var(--line) !important;
+            border-radius: 17px !important; box-shadow: 0 8px 28px rgba(32,42,73,.045);
+            padding: 1.1rem 1.2rem 1.2rem;
+        }
+        .st-key-profile-task-picker {
+            min-height: 150px !important; box-sizing: border-box; padding: 1rem 1.15rem !important;
+            background: #fff !important; border-color: var(--line) !important;
+            border-radius: 17px !important; box-shadow: 0 8px 28px rgba(32,42,73,.045) !important;
+        }
+        .st-key-profile-task-picker [data-testid="stSelectbox"] { margin-top: .05rem; }
+        [class*="st-key-profile-status-"],
+        [class*="st-key-profile-pool-"],
+        [class*="st-key-profile-result-"],
+        [class*="st-key-profile-export-"] {
+            padding: 1rem 1.15rem 1.15rem !important; background: #fff !important;
+            border-color: var(--line) !important; border-radius: 17px !important;
+            box-shadow: 0 8px 28px rgba(32,42,73,.045) !important;
+        }
+        .connection-title { color: #1d2638; font-size: .9rem; font-weight: 760; }
+        .connection-copy { color: #7b8496; font-size: .72rem; margin-top: .2rem; line-height: 1.5; }
+        [class*="st-key-boss-connection-"] {
+            padding: .8rem .9rem !important; background: #fff !important;
+            border-color: var(--line) !important; border-radius: 15px !important;
+            box-shadow: 0 5px 18px rgba(32,42,73,.04) !important;
+        }
+        [class*="st-key-boss-connection-"] .stButton button {
+            min-height: 2.15rem; padding: .3rem .55rem; font-size: .76rem;
+        }
+        .job-list-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .8rem; }
+        .job-list-heading strong { color: #1d2638; font-size: 1rem; }
+        .job-count-badge { display: inline-flex; padding: .3rem .65rem; border-radius: 999px; background: #eaf2ff; color: #3473d5; font-size: .69rem; font-weight: 720; }
+        .st-key-job-list-shell {
+            padding: .95rem 1rem 1rem !important; background: #fff !important; gap: 0 !important;
+            border-color: var(--line) !important; border-radius: 17px !important;
+            box-shadow: 0 8px 28px rgba(32,42,73,.045) !important;
+        }
+        .st-key-job-table-header {
+            min-height: 42px !important; padding: .72rem .82rem !important; background: #f5f7fa;
+            border: 1px solid #e7eaf0; border-radius: 12px 12px 0 0;
+            justify-content: center !important;
+        }
+        .job-table-header-label { color: #667085; font-size: .72rem; font-weight: 740; }
+        .st-key-job-list-shell [class*="st-key-job-row-"] {
+            padding: .78rem .82rem !important; border: 1px solid #e7eaf0; border-top: 0;
+            border-radius: 0; background: #fff; transition: background .15s ease;
+        }
+        .st-key-job-list-shell [class*="st-key-job-row-"]:hover { background: #fafbfe; }
+        .st-key-job-list-shell [class*="st-key-job-row-last-"] { border-radius: 0 0 12px 12px; }
+        .job-title { color: #1c2537; font-size: .94rem; font-weight: 750; line-height: 1.4; }
+        .job-meta { color: #8992a3; font-size: .68rem; margin-top: .2rem; }
+        .job-score { color: #4f46d8; font-size: 1.12rem; font-weight: 790; letter-spacing: -.03em; }
+        .job-stat-label { color: #929aaa; font-size: .63rem; margin-top: .05rem; }
+        .job-keyword-count { color: #30394b; font-size: .76rem; font-weight: 720; line-height: 1.55; }
+        .job-keyword-count span { color: #929aaa; font-size: .63rem; font-weight: 500; display: block; }
+        .job-decision { display: inline-flex; padding: .28rem .52rem; border-radius: 999px; font-size: .66rem; font-weight: 720; white-space: nowrap; }
+        .job-decision.good { background: #e8f8f1; color: #20825f; }
+        .job-decision.review { background: #fff4df; color: #a76a12; }
+        .job-decision.bad { background: #feecef; color: #bd4053; }
+        .job-decision.neutral { background: #edf0f5; color: #626d80; }
+        .st-key-job-list-shell .stButton button {
+            min-height: 2.1rem; padding: .25rem .4rem; font-size: .72rem;
         }
         [data-testid="stMetric"] {
             background: white; border: 1px solid var(--line); border-radius: 16px; padding: .9rem 1rem;
@@ -398,7 +462,7 @@ def render_profile_workspace(client: ProfileClient) -> None:
     with metric_col:
         render_metric_card("历史画像", str(len(tasks)), "持续保留，可随时重新生成")
     with selector_col:
-        with st.container(border=True):
+        with st.container(border=True, key="profile-task-picker"):
             st.markdown(
                 """
                 <div class="profile-task-heading">
@@ -651,34 +715,14 @@ def render_job_pool(profile_client: ProfileClient, client: CareerClient) -> None
     )
     try:
         browser = client.browser_status()
-    except CareerClientError as exc:
-        browser = {"enabled": False, "connected": False, "message": str(exc)}
-    with st.container(border=True):
-        status_text = (
-            "已登录 BOSS"
-            if browser.get("boss_logged_in")
-            else "Chrome 已连接"
-            if browser.get("connected")
-            else "等待连接"
-        )
-        st.markdown(f"### BOSS 直聘连接 · {status_text}")
-        st.caption(
-            browser.get("message") or "使用独立 Chrome 会话，不读取或保存你的日常浏览器资料。"
-        )
-        if not browser.get("connected"):
-            st.code("sh scripts/start_boss_chrome.sh", language="bash")
-        boss_actions = st.columns(2)
-        with boss_actions[0]:
-            if st.button("打开 BOSS 登录页", use_container_width=True):
-                try:
-                    client.open_boss()
-                    set_flash("BOSS 登录页已在独立 Chrome 中打开")
-                    st.rerun()
-                except CareerClientError as exc:
-                    st.error(f"打开失败：{exc}")
-        with boss_actions[1]:
-            if st.button("重新检测连接", use_container_width=True):
-                st.rerun()
+    except CareerClientError:
+        browser = {"enabled": False, "connected": False, "boss_logged_in": False}
+    render_boss_connection_panel(
+        client,
+        browser,
+        key="boss-connection-job-pool",
+        note="连接仅用于岗位采集，不读取或保存你的日常浏览器资料。",
+    )
     try:
         profiles = [
             item
@@ -807,35 +851,81 @@ def render_job_pool(profile_client: ProfileClient, client: CareerClient) -> None
         render_empty("当前活动还没有岗位。")
         return
     selected_job_ids = []
-    for item in jobs:
-        job = item.get("job", item)
-        evaluation = item.get("evaluation") or {}
-        with st.container(border=True):
-            top, select_col, delete_col = st.columns([6, 1.2, 1.2])
-            with top:
-                st.markdown(f"### {job.get('company')} · {job.get('title')}")
-                st.caption(
-                    f"{job.get('location') or '地点未提供'} · {job.get('platform')} · {job.get('status')}"
-                )
-            with select_col:
-                if st.checkbox("批量定制", key=f"select-job-{job['id']}"):
-                    selected_job_ids.append(job["id"])
-            with delete_col:
-                if st.button("删除", key=f"delete-job-{job['id']}"):
-                    try:
-                        client.delete_job(job["id"])
-                        set_flash("岗位已删除")
-                        st.rerun()
-                    except CareerClientError as exc:
-                        st.error(f"删除失败：{exc}")
-            render_metric_row(
-                [
-                    ("匹配分", str(evaluation.get("overall_score", "-")), "0–100，仅用于排序"),
-                    ("建议", evaluation.get("decision", "待评分"), "已应用硬筛选规则"),
-                    ("已覆盖", str(len(evaluation.get("matched_keywords", []))), "岗位关键词"),
-                    ("能力缺口", str(len(evaluation.get("missing_keywords", []))), "可统一补充"),
-                ]
+    with st.container(border=True, key="job-list-shell"):
+        st.markdown(
+            f"""
+            <div class="job-list-heading">
+                <strong>岗位列表</strong>
+                <span class="job-count-badge">共 {len(jobs)} 个岗位 · {html.escape(current_campaign['title'])}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.container(key="job-table-header"):
+            header_columns = st.columns(
+                [4.2, 0.85, 1.25, 1.3, 0.72, 0.72], vertical_alignment="center"
             )
+            for column, label in zip(
+                header_columns,
+                ["岗位信息", "匹配分", "投递建议", "关键词匹配", "选择", "操作"],
+                strict=True,
+            ):
+                column.markdown(
+                    f'<div class="job-table-header-label">{label}</div>',
+                    unsafe_allow_html=True,
+                )
+        for index, item in enumerate(jobs):
+            job = item.get("job", item)
+            evaluation = item.get("evaluation") or {}
+            decision_label, decision_tone = job_decision_meta(evaluation.get("decision"))
+            row_key = "job-row-last" if index == len(jobs) - 1 else "job-row"
+            with st.container(key=f"{row_key}-{job['id']}"):
+                title_col, score_col, decision_col, keyword_col, select_col, delete_col = (
+                    st.columns(
+                        [4.2, 0.85, 1.25, 1.3, 0.72, 0.72],
+                        vertical_alignment="center",
+                    )
+                )
+                with title_col:
+                    st.markdown(
+                        f"""
+                        <div class="job-title">{html.escape(job.get('company') or '公司未提供')} · {html.escape(job.get('title') or '职位未提供')}</div>
+                        <div class="job-meta">{html.escape(job.get('location') or '地点未提供')} · {html.escape(job.get('platform') or 'manual')} · {html.escape(job.get('status') or '待处理')}</div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with score_col:
+                    st.markdown(
+                        f'<div class="job-score">{html.escape(str(evaluation.get("overall_score", "-")))}</div><div class="job-stat-label">匹配分</div>',
+                        unsafe_allow_html=True,
+                    )
+                with decision_col:
+                    st.markdown(
+                        f'<span class="job-decision {decision_tone}">{html.escape(decision_label)}</span>',
+                        unsafe_allow_html=True,
+                    )
+                with keyword_col:
+                    st.markdown(
+                        f"""
+                        <div class="job-keyword-count">{len(evaluation.get('matched_keywords', []))} 已覆盖<span>{len(evaluation.get('missing_keywords', []))} 项能力缺口</span></div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with select_col:
+                    if st.checkbox(
+                        "选择",
+                        key=f"select-job-{job['id']}",
+                        label_visibility="collapsed",
+                    ):
+                        selected_job_ids.append(job["id"])
+                with delete_col:
+                    if st.button("删除", key=f"delete-job-{job['id']}"):
+                        try:
+                            client.delete_job(job["id"])
+                            set_flash("岗位已删除")
+                            st.rerun()
+                        except CareerClientError as exc:
+                            st.error(f"删除失败：{exc}")
     if selected_job_ids and st.button("为选中岗位批量生成 JD 匹配", type="primary"):
         try:
             client.create_batch(current_campaign["id"], selected_job_ids, "岗位池批量定制")
@@ -987,15 +1077,12 @@ def render_application_center(client: CareerClient) -> None:
     except CareerClientError as exc:
         st.error(f"读取投递中心失败：{exc}")
         return
-    with st.container(border=True):
-        if browser.get("boss_logged_in"):
-            st.success("BOSS 直聘已连接。BOSS 岗位会在确认后发送定制招呼语。")
-        elif browser.get("connected"):
-            st.warning("Chrome 已连接，但尚未检测到 BOSS 登录状态。")
-        else:
-            st.warning("投递浏览器未连接。请先运行以下命令并登录 BOSS 直聘。")
-            st.code("sh scripts/start_boss_chrome.sh", language="bash")
-        st.caption("BOSS 不使用传统申请表：确认投递代表发送招呼语；简历附件不会自动发送。")
+    render_boss_connection_panel(
+        client,
+        browser,
+        key="boss-connection-application-center",
+        note="确认投递代表发送招呼语；简历附件仍由你决定是否发送。",
+    )
     if resumes:
         with st.form("application-create-form"):
             resume_id = st.selectbox(
@@ -1167,6 +1254,69 @@ def split_values(value: str) -> list[str]:
     return list(dict.fromkeys(item.strip() for item in normalized.split(",") if item.strip()))
 
 
+def render_boss_connection_panel(
+    client: CareerClient,
+    browser: dict,
+    *,
+    key: str,
+    note: str,
+) -> None:
+    if browser.get("boss_logged_in"):
+        status_label, status_icon, status_tone = "BOSS 已登录", "✓", "success"
+        status_copy = "浏览器会话和登录状态均正常。"
+    elif browser.get("connected"):
+        status_label, status_icon, status_tone = "Chrome 已连接", "◌", "warning"
+        status_copy = "请在独立 Chrome 窗口中完成 BOSS 登录。"
+    else:
+        status_label, status_icon, status_tone = "未连接", "◷", "neutral"
+        status_copy = "启动独立 Chrome 并登录后重新检测。"
+
+    with st.container(border=True, key=key):
+        copy_col, status_col, open_col, refresh_col, help_col = st.columns(
+            [4.5, 1.35, 1, 1, 0.9], vertical_alignment="center"
+        )
+        with copy_col:
+            st.markdown(
+                f"""
+                <div class="connection-title">BOSS 直聘连接</div>
+                <div class="connection-copy">{html.escape(status_copy)} {html.escape(note)}</div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with status_col:
+            st.markdown(
+                f'<span class="status-pill status-{status_tone}">{status_icon} {status_label}</span>',
+                unsafe_allow_html=True,
+            )
+        with open_col:
+            if st.button("打开", use_container_width=True, key=f"{key}-open"):
+                try:
+                    client.open_boss()
+                    set_flash("BOSS 登录页已在独立 Chrome 中打开")
+                    st.rerun()
+                except CareerClientError:
+                    st.toast("暂时无法打开，请先启动独立 Chrome。", icon="⚠️")
+        with refresh_col:
+            if st.button("刷新", use_container_width=True, key=f"{key}-refresh"):
+                st.rerun()
+        with help_col:
+            if not browser.get("connected"):
+                with st.popover("帮助", width="stretch"):
+                    st.caption("在终端启动独立 Chrome，登录 BOSS 后返回刷新状态。")
+                    st.code("sh scripts/start_boss_chrome.sh", language="bash")
+
+
+def job_decision_meta(decision: str | None) -> tuple[str, str]:
+    return {
+        "recommended": ("推荐投递", "good"),
+        "recommend": ("推荐投递", "good"),
+        "review": ("建议查看", "review"),
+        "needs_confirmation": ("需要确认", "review"),
+        "not_recommended": ("不建议投递", "bad"),
+        "filtered": ("已过滤", "bad"),
+    }.get(decision or "", ("待评分", "neutral"))
+
+
 def render_sidebar_stats(total: int, completed: int, active: int) -> None:
     st.sidebar.markdown(
         f"""
@@ -1182,43 +1332,42 @@ def render_sidebar_stats(total: int, completed: int, active: int) -> None:
 
 
 def render_upload(client: ProfileClient) -> None:
-    with st.container(border=True):
-        with st.form("upload-form"):
-            title = st.text_input("任务名称", placeholder="例如：2026 春招完整画像")
-            files = st.file_uploader(
-                "上传资料",
-                type=["doc", "docx", "pdf", "md", "ppt", "pptx"],
-                accept_multiple_files=True,
-                help="最多 20 个文件，单文件默认不超过 50 MB。",
+    with st.form("upload-form"):
+        title = st.text_input("任务名称", placeholder="例如：2026 春招完整画像")
+        files = st.file_uploader(
+            "上传资料",
+            type=["doc", "docx", "pdf", "md", "ppt", "pptx"],
+            accept_multiple_files=True,
+            help="最多 20 个文件，单文件默认不超过 50 MB。",
+        )
+        spacer_col, action_col = st.columns([2, 1], vertical_alignment="bottom")
+        with spacer_col:
+            st.empty()
+        with action_col:
+            submitted = st.form_submit_button(
+                "开始整理资料",
+                type="primary",
+                use_container_width=True,
             )
-            spacer_col, action_col = st.columns([2, 1], vertical_alignment="bottom")
-            with spacer_col:
-                st.empty()
-            with action_col:
-                submitted = st.form_submit_button(
-                    "开始整理资料",
-                    type="primary",
-                    use_container_width=True,
-                )
-        if submitted:
-            if not files:
-                st.warning("请先上传至少一份资料。")
-                return
-            fingerprint = profile_submission_fingerprint(title, files)
-            if is_duplicate_submission("profile", fingerprint):
-                st.toast("该画像任务刚刚已保存，请勿重复点击。", icon="ℹ️")
-                return
-            try:
-                response = client.create_profile(
-                    files,
-                    title=title,
-                )
-                remember_submission("profile", fingerprint)
-                queue_selector(PROFILE_SELECTOR_KEY, response["task_id"])
-                set_flash("画像任务已保存并加入处理队列。")
-                st.rerun()
-            except ProfileClientError as exc:
-                st.error(str(exc))
+    if submitted:
+        if not files:
+            st.warning("请先上传至少一份资料。")
+            return
+        fingerprint = profile_submission_fingerprint(title, files)
+        if is_duplicate_submission("profile", fingerprint):
+            st.toast("该画像任务刚刚已保存，请勿重复点击。", icon="ℹ️")
+            return
+        try:
+            response = client.create_profile(
+                files,
+                title=title,
+            )
+            remember_submission("profile", fingerprint)
+            queue_selector(PROFILE_SELECTOR_KEY, response["task_id"])
+            set_flash("画像任务已保存并加入处理队列。")
+            st.rerun()
+        except ProfileClientError as exc:
+            st.error(str(exc))
 
 
 def render_task(client: ProfileClient, task_id: str) -> None:
@@ -1227,28 +1376,29 @@ def render_task(client: ProfileClient, task_id: str) -> None:
     except ProfileClientError as exc:
         st.error(str(exc))
         return
-    title_col, status_col = st.columns([5.2, 1], vertical_alignment="top")
-    with title_col:
-        st.markdown(
-            f"""
-            <div style="padding:.45rem 0 .35rem;">
-                <div class="compact-task-title">{html.escape(task["title"])}</div>
-                <div class="compact-task-meta">资料画像任务 · 创建于 {html.escape(format_time(task.get("created_at")))}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with status_col:
-        label, icon, tone = status_meta(task["status"])
-        st.markdown(
-            f'<div style="text-align:center;margin-bottom:.35rem;"><span class="status-pill status-{tone}">{icon} {label}</span></div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("刷新状态", use_container_width=True, key=f"refresh-profile-{task_id}"):
-            st.rerun()
-    st.progress(task["progress"] / 100, text=f"{stage_label(task['stage'])} · {task['progress']}%")
-    if task.get("error") and "未解决冲突" not in task["error"]:
-        st.warning(task["error"])
+    with st.container(border=True, key=f"profile-status-{task_id}"):
+        title_col, status_col = st.columns([5.2, 1], vertical_alignment="top")
+        with title_col:
+            st.markdown(
+                f"""
+                <div style="padding:.25rem 0 .2rem;">
+                    <div class="compact-task-title">{html.escape(task["title"])}</div>
+                    <div class="compact-task-meta">资料画像任务 · 创建于 {html.escape(format_time(task.get("created_at")))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with status_col:
+            label, icon, tone = status_meta(task["status"])
+            st.markdown(
+                f'<div style="text-align:center;margin-bottom:.25rem;"><span class="status-pill status-{tone}">{icon} {label}</span></div>',
+                unsafe_allow_html=True,
+            )
+            if st.button("刷新状态", use_container_width=True, key=f"refresh-profile-{task_id}"):
+                st.rerun()
+        st.progress(task["progress"] / 100, text=f"{stage_label(task['stage'])} · {task['progress']}%")
+        if task.get("error") and "未解决冲突" not in task["error"]:
+            st.warning(task["error"])
     render_profile_pool(client, task)
 
     status = task["status"]
@@ -1272,123 +1422,122 @@ def render_task(client: ProfileClient, task_id: str) -> None:
 
 
 def render_profile_pool(client: ProfileClient, task: dict) -> None:
-    documents = task.get("documents", [])
-    title_col, action_col = st.columns([5, 1], vertical_alignment="center")
-    with title_col:
-        st.markdown(
-            f"""
-            <div class="pool-title-row">
-                <h3>画像池</h3>
-                <span>当前保存 {len(documents)} 份资料，文件状态会随解析进度更新</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with action_col:
-        with st.popover("＋ 补充资料", width="stretch"):
-            supplement_files = st.file_uploader(
-                "继续添加简历或经历资料",
-                type=["doc", "docx", "pdf", "md", "ppt", "pptx"],
-                accept_multiple_files=True,
-                key=f"supplement-files-{task['id']}",
+    with st.container(border=True, key=f"profile-pool-{task['id']}"):
+        documents = task.get("documents", [])
+        title_col, action_col = st.columns([5, 1], vertical_alignment="center")
+        with title_col:
+            st.markdown(
+                f"""
+                <div class="pool-title-row">
+                    <h3>画像池</h3>
+                    <span>当前保存 {len(documents)} 份资料，文件状态会随解析进度更新</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            active = task["status"] in {
-                "queued",
-                "parsing",
-                "extracting",
-                "generating",
-                "auditing",
-            }
-            if active:
-                st.caption("当前任务处理中，完成后即可继续补充。")
-            if st.button(
-                "保存并重新整理",
-                type="primary",
-                use_container_width=True,
-                disabled=active or not supplement_files,
-                key=f"supplement-submit-{task['id']}",
-            ):
-                fingerprint = profile_submission_fingerprint(
-                    f"supplement:{task['id']}", supplement_files
+        with action_col:
+            with st.popover("＋ 补充资料", width="stretch"):
+                supplement_files = st.file_uploader(
+                    "继续添加简历或经历资料",
+                    type=["doc", "docx", "pdf", "md", "ppt", "pptx"],
+                    accept_multiple_files=True,
+                    key=f"supplement-files-{task['id']}",
                 )
-                if is_duplicate_submission("profile-supplement", fingerprint):
-                    st.toast("这些资料刚刚已保存，请勿重复点击。", icon="ℹ️")
-                else:
-                    try:
-                        response = client.add_documents(task["id"], supplement_files)
-                        remember_submission("profile-supplement", fingerprint)
-                        set_flash(
-                            f"补充资料已保存，共新增 {response['added_count']} 份，画像已重新进入处理队列。"
-                        )
-                        st.rerun()
-                    except ProfileClientError as exc:
-                        st.error(str(exc))
-    if not documents:
-        render_empty("当前任务暂时没有可显示的资料文件。")
-        return
-    rows = [
-        {
-            "文件名": document.get("original_name", ""),
-            "格式": (document.get("extension") or "").replace(".", "").upper(),
-            "大小": format_file_size(document.get("size_bytes", 0)),
-            "状态": document_status_label(document.get("status", "")),
-            "错误": document.get("error") or "",
-        }
-        for document in documents
-    ]
-    st.dataframe(
-        rows,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "文件名": st.column_config.TextColumn(width="large"),
-            "格式": st.column_config.TextColumn(width="small"),
-            "大小": st.column_config.TextColumn(width="small"),
-            "状态": st.column_config.TextColumn(width="small"),
-            "错误": st.column_config.TextColumn(width="medium"),
-        },
-    )
+                active = task["status"] in {
+                    "queued",
+                    "parsing",
+                    "extracting",
+                    "generating",
+                    "auditing",
+                }
+                if active:
+                    st.caption("当前任务处理中，完成后即可继续补充。")
+                if st.button(
+                    "保存并重新整理",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=active or not supplement_files,
+                    key=f"supplement-submit-{task['id']}",
+                ):
+                    fingerprint = profile_submission_fingerprint(
+                        f"supplement:{task['id']}", supplement_files
+                    )
+                    if is_duplicate_submission("profile-supplement", fingerprint):
+                        st.toast("这些资料刚刚已保存，请勿重复点击。", icon="ℹ️")
+                    else:
+                        try:
+                            response = client.add_documents(task["id"], supplement_files)
+                            remember_submission("profile-supplement", fingerprint)
+                            set_flash(
+                                f"补充资料已保存，共新增 {response['added_count']} 份，画像已重新进入处理队列。"
+                            )
+                            st.rerun()
+                        except ProfileClientError as exc:
+                            st.error(str(exc))
+        if not documents:
+            render_empty("当前任务暂时没有可显示的资料文件。")
+            return
+        rows = [
+            {
+                "文件名": document.get("original_name", ""),
+                "格式": (document.get("extension") or "").replace(".", "").upper(),
+                "大小": format_file_size(document.get("size_bytes", 0)),
+                "状态": document_status_label(document.get("status", "")),
+                "错误": document.get("error") or "",
+            }
+            for document in documents
+        ]
+        st.dataframe(
+            rows,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "文件名": st.column_config.TextColumn(width="large"),
+                "格式": st.column_config.TextColumn(width="small"),
+                "大小": st.column_config.TextColumn(width="small"),
+                "状态": st.column_config.TextColumn(width="small"),
+                "错误": st.column_config.TextColumn(width="medium"),
+            },
+        )
 
 
 def render_result(client: ProfileClient, task_id: str) -> None:
     result = client.get_result(task_id)
-    render_section_heading(
-        "五维画像", "每个维度均可单独下载 Markdown，并保留事实、置信度和证据来源。"
-    )
-    tabs = st.tabs([label for _, label, _ in DIMENSIONS])
-    for tab, (key, label, description) in zip(tabs, DIMENSIONS, strict=True):
-        with tab:
-            render_dimension_header(label, description, result[key].get("status"))
-            render_profile_dimension(key, result[key])
-            st.download_button(
-                f"下载 {label} Markdown",
-                data=client.download_section(task_id, key),
-                file_name=f"{key}.md",
-                mime="text/markdown",
-                key=f"profile-section:{task_id}:{key}",
-            )
-    render_export_center(
-        [
-            ("Markdown", client.download(task_id, "md"), "profile.md", "text/markdown"),
-            (
-                "DOCX",
-                client.download(task_id, "docx"),
-                "profile.docx",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ),
-            (
-                "JSON",
-                json.dumps(result, ensure_ascii=False, indent=2),
-                "profile.json",
-                "application/json",
-            ),
-        ],
-        "导出完整画像",
-    )
-    if st.button("根据当前事实重新生成", key=f"regenerate-profile-{task_id}"):
-        client.regenerate(task_id)
-        set_flash("重新生成请求已保存并加入队列。")
-        st.rerun()
+    with st.container(border=True, key=f"profile-result-{task_id}"):
+        render_section_heading(
+            "五维画像", "每个维度均可单独下载 Markdown，并保留事实、置信度和证据来源。"
+        )
+        tabs = st.tabs([label for _, label, _ in DIMENSIONS])
+        for tab, (key, label, description) in zip(tabs, DIMENSIONS, strict=True):
+            with tab:
+                render_dimension_header(label, description, result[key].get("status"))
+                render_profile_dimension(key, result[key])
+                st.download_button(
+                    f"下载 {label} Markdown",
+                    data=client.download_section(task_id, key),
+                    file_name=f"{key}.md",
+                    mime="text/markdown",
+                    key=f"profile-section:{task_id}:{key}",
+                )
+    with st.container(border=True, key=f"profile-export-{task_id}"):
+        render_export_center(
+            [
+                ("Markdown", client.download(task_id, "md"), "profile.md", "text/markdown"),
+                (
+                    "DOCX",
+                    client.download(task_id, "docx"),
+                    "profile.docx",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ),
+                (
+                    "JSON",
+                    json.dumps(result, ensure_ascii=False, indent=2),
+                    "profile.json",
+                    "application/json",
+                ),
+            ],
+            "导出完整画像",
+        )
 
 
 def render_profile_dimension(section_name: str, section: dict) -> None:
