@@ -6,7 +6,7 @@ from applications.browser.safety import detect_blockers
 from applications.models import BrowserConnectionStatus
 from core.settings import Settings
 
-BOSS_HOME_URL = "https://www.zhipin.com/"
+BOSS_LOGIN_URL = "https://www.zhipin.com/web/user/?ka=header-login"
 
 
 class BrowserRuntime:
@@ -43,7 +43,7 @@ class BrowserRuntime:
                 status.browser_version = browser.version if browser else ""
                 if open_boss:
                     page = await context.new_page()
-                    await page.goto(BOSS_HOME_URL, wait_until="domcontentloaded")
+                    await page.goto(BOSS_LOGIN_URL, wait_until="domcontentloaded")
                 boss_pages = [page for page in context.pages if "zhipin.com" in page.url.casefold()]
                 if not boss_pages:
                     status.message = "已连接 Chrome，请打开 BOSS 直聘并完成登录。"
