@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class BasisType(StrEnum):
@@ -13,11 +13,27 @@ class BasisType(StrEnum):
 
 class FactCategory(StrEnum):
     PERSONAL = "personal_introduction"
-    PROFESSIONAL = "professional_introduction"
+    CAPABILITY = "capabilities"
     PROJECT = "project_experiences"
     COMPETITION = "competition_experiences"
     INTERNSHIP = "internship_experiences"
     EDUCATION = "education_history"
+
+    @classmethod
+    def _missing_(cls, value):
+        if value == "professional_introduction":
+            return cls.CAPABILITY
+        return None
+
+
+PROFILE_SECTION_CATEGORIES = (
+    FactCategory.PERSONAL,
+    FactCategory.PROJECT,
+    FactCategory.COMPETITION,
+    FactCategory.INTERNSHIP,
+    FactCategory.EDUCATION,
+)
+PROFILE_SECTION_KEYS = tuple(category.value for category in PROFILE_SECTION_CATEGORIES)
 
 
 class FactStatus(StrEnum):
@@ -54,6 +70,11 @@ class ProfileFact(BaseModel):
     status: FactStatus = FactStatus.EXTRACTED
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @property
+    def material_group_id(self) -> str | None:
+        value = self.metadata.get("material_group_id")
+        return str(value) if value else None
+
 
 class ConflictRecord(BaseModel):
     field: str
@@ -70,23 +91,19 @@ class ProfileClaim(BaseModel):
     rationale: str = ""
 
 
+class PersonalInformationItem(BaseModel):
+    key: str
+    label: str
+    value: str
+    confidence: float = Field(default=0.8, ge=0, le=1)
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    source_fact_ids: list[str] = Field(default_factory=list)
+
+
 class PersonalIntroduction(BaseModel):
     status: SectionStatus = SectionStatus.INSUFFICIENT_EVIDENCE
-    overview: str = "未从资料中获得足够信息。"
-    core_strengths: list[ProfileClaim] = Field(default_factory=list)
-    work_characteristics: list[ProfileClaim] = Field(default_factory=list)
-    career_direction: list[ProfileClaim] = Field(default_factory=list)
-    keywords: list[str] = Field(default_factory=list)
-
-
-class ProfessionalIntroduction(BaseModel):
-    status: SectionStatus = SectionStatus.INSUFFICIENT_EVIDENCE
-    overview: str = "未从资料中获得足够信息。"
-    knowledge_domains: list[ProfileClaim] = Field(default_factory=list)
-    skills: list[ProfileClaim] = Field(default_factory=list)
-    tools_and_technologies: list[str] = Field(default_factory=list)
-    research_interests: list[ProfileClaim] = Field(default_factory=list)
-    certifications: list[ProfileClaim] = Field(default_factory=list)
+    overview: str = "未从资料中识别到个人基本信息。"
+    items: list[PersonalInformationItem] = Field(default_factory=list)
 
 
 class ExperienceEntry(BaseModel):
@@ -99,6 +116,7 @@ class ExperienceEntry(BaseModel):
     technologies: list[str] = Field(default_factory=list)
     outcomes: list[ProfileClaim] = Field(default_factory=list)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    source_fact_ids: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.8, ge=0, le=1)
     attributes: dict[str, str] = Field(default_factory=dict)
 
@@ -115,10 +133,15 @@ class EducationEntry(BaseModel):
     major: str | None = None
     period: str | None = None
     overview: str
+    average_score: str | None = None
+    ranking: str | None = None
+    evaluation: str | None = None
+    language_scores: list[str] = Field(default_factory=list)
     courses: list[str] = Field(default_factory=list)
     honors: list[ProfileClaim] = Field(default_factory=list)
     campus_experiences: list[ProfileClaim] = Field(default_factory=list)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    source_fact_ids: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.8, ge=0, le=1)
 
 
@@ -138,9 +161,6 @@ class ProfileAudit(BaseModel):
 class ProfileResult(BaseModel):
     task_id: str
     personal_introduction: PersonalIntroduction = Field(default_factory=PersonalIntroduction)
-    professional_introduction: ProfessionalIntroduction = Field(
-        default_factory=ProfessionalIntroduction
-    )
     project_experiences: ExperienceSection = Field(default_factory=ExperienceSection)
     competition_experiences: ExperienceSection = Field(default_factory=ExperienceSection)
     internship_experiences: ExperienceSection = Field(default_factory=ExperienceSection)
@@ -150,3 +170,17 @@ class ProfileResult(BaseModel):
     audit: ProfileAudit = Field(default_factory=ProfileAudit)
     model: str = ""
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def exclude_unverified_competitions(self):
+        verified = [
+            entry
+            for entry in self.competition_experiences.entries
+            if entry.attributes.get("verification_matched_name")
+        ]
+        if len(verified) != len(self.competition_experiences.entries):
+            self.competition_experiences.entries = verified
+            if not verified:
+                self.competition_experiences.status = SectionStatus.INSUFFICIENT_EVIDENCE
+                self.competition_experiences.overview = "未找到通过联网模糊检索核验的比赛经历。"
+        return self

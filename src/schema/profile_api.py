@@ -35,6 +35,12 @@ class TaskCreated(BaseModel):
     status: TaskStatus
 
 
+class DocumentsAdded(TaskCreated):
+    added_count: int = Field(ge=0)
+    skipped_count: int = Field(default=0, ge=0)
+    errors: list[str] = Field(default_factory=list)
+
+
 class DocumentSummary(BaseModel):
     id: str
     original_name: str

@@ -9,6 +9,7 @@ from core.settings import Settings, get_settings
 def isolate_llm_settings(monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "")
     monkeypatch.setenv("MATCH_MODEL", "")
+    monkeypatch.setenv("JOB_SEARCH_ENABLED", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from profile.models import ProfileFact
+from profile.section_documents import write_profile_section_documents
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -11,6 +12,7 @@ from agents.jd_match_agent.nodes.audit import audit_result
 from jobs.match_runner import MatchJobAction, MatchJobRunner
 from matching.exporters import export_match_docx, export_match_markdown
 from matching.models import JDMatchResult, MatchVersionSource
+from matching.section_documents import render_result_section_documents
 from matching.validation import apply_draft_updates, validate_jd_text
 from schema.match_api import (
     DraftUpdateRequest,
@@ -48,6 +50,7 @@ async def create_match(
     payload: MatchCreateRequest,
     profile_repository: ProfileRepository = Depends(get_repository),
     repository: MatchRepository = Depends(get_match_repository),
+    storage: FileStorage = Depends(get_storage),
     runner: MatchJobRunner = Depends(get_match_job_runner),
 ) -> MatchTaskCreated:
     profile_task = profile_repository.get_task(payload.profile_task_id)
@@ -66,13 +69,23 @@ async def create_match(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     match_id = str(uuid4())
+    facts = profile_repository.get_facts(payload.profile_task_id)
+    section_paths = write_profile_section_documents(
+        profile_result,
+        facts,
+        storage.profile_sections_dir(payload.profile_task_id),
+    )
     repository.create_task(
         match_id=match_id,
         profile_task_id=payload.profile_task_id,
         title=payload.title.strip() or f"{profile_task.title} · JD 匹配",
         jd_text=jd_text,
         profile_result=profile_result,
-        facts=profile_repository.get_facts(payload.profile_task_id),
+        profile_sections={
+            section_name: path.read_text(encoding="utf-8")
+            for section_name, path in section_paths.items()
+        },
+        facts=facts,
         conflicts=profile_repository.get_conflicts(payload.profile_task_id),
     )
     await runner.enqueue(match_id, MatchJobAction.FULL)
@@ -104,11 +117,11 @@ def get_match_result(
     version: int | None = Query(default=None, ge=1),
     repository: MatchRepository = Depends(get_match_repository),
 ) -> MatchResultResponse:
-    _require_task(repository, match_id)
+    task = _require_task(repository, match_id)
     result = _get_result_version(repository, match_id, version)
     if result is None:
         raise HTTPException(status_code=409, detail="匹配结果尚未生成。")
-    return MatchResultResponse(result=result)
+    return MatchResultResponse(result=_with_section_documents(result, task))
 
 
 @router.get("/{match_id}/versions", response_model=list[MatchVersionSummary])
@@ -133,6 +146,7 @@ def update_match_draft(
     current = repository.get_result(match_id)
     if current is None:
         raise HTTPException(status_code=409, detail="匹配结果尚未生成。")
+    current = _with_section_documents(current, task)
     if current.version != payload.expected_version:
         raise HTTPException(status_code=409, detail="结果版本已变化，请刷新后再编辑。")
     updated, violations = apply_draft_updates(
@@ -191,10 +205,11 @@ def restore_match_version(
     repository: MatchRepository = Depends(get_match_repository),
     storage: FileStorage = Depends(get_storage),
 ) -> MatchResultResponse:
-    _require_task(repository, match_id)
+    task = _require_task(repository, match_id)
     source = repository.get_version(match_id, version)
     if source is None:
         raise HTTPException(status_code=404, detail="匹配版本不存在。")
+    source = _with_section_documents(source, task)
     restored = source.model_copy(deep=True)
     restored.version = repository.next_version(match_id)
     restored.generated_at = datetime.now(UTC)
@@ -262,10 +277,11 @@ def export_match(
     version: int | None = Query(default=None, ge=1),
     repository: MatchRepository = Depends(get_match_repository),
 ):
-    _require_task(repository, match_id)
+    task = _require_task(repository, match_id)
     result = _get_result_version(repository, match_id, version)
     if result is None:
         raise HTTPException(status_code=404, detail="匹配结果不存在。")
+    result = _with_section_documents(result, task)
     if format == "json":
         return Response(
             content=json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2),
@@ -284,14 +300,14 @@ def export_match(
 
 
 @router.delete("/{match_id}", response_model=MatchDeleteResponse)
-def delete_match(
+async def delete_match(
     match_id: str,
     repository: MatchRepository = Depends(get_match_repository),
     storage: FileStorage = Depends(get_storage),
+    runner: MatchJobRunner = Depends(get_match_job_runner),
 ) -> MatchDeleteResponse:
-    task = _require_task(repository, match_id)
-    if task.status in ACTIVE_STATUSES:
-        raise HTTPException(status_code=409, detail="匹配任务处理中，暂不能删除。")
+    _require_task(repository, match_id)
+    await runner.cancel(match_id)
     storage.delete_match_files(match_id)
     repository.delete_task(match_id)
     return MatchDeleteResponse()
@@ -310,10 +326,22 @@ def _get_result_version(
     return repository.get_version(match_id, version) if version else repository.get_result(match_id)
 
 
+def _with_section_documents(result: JDMatchResult, task) -> JDMatchResult:
+    if result.section_documents:
+        return result
+    result.section_documents = render_result_section_documents(
+        result,
+        [ProfileFact.model_validate(item) for item in task.facts_snapshot],
+    )
+    return result
+
+
 def _summary(task) -> MatchTaskSummary:
     return MatchTaskSummary(
         id=task.id,
         profile_task_id=task.profile_task_id,
+        job_id=task.job_id,
+        batch_id=task.batch_id,
         title=task.title,
         status=task.status,
         stage=task.stage,

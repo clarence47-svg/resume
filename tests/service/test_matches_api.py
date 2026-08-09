@@ -21,7 +21,7 @@ def _create_profile(client: TestClient) -> str:
         files={
             "files": (
                 "resume.md",
-                "# 专业介绍\n熟练使用 Python 和 FastAPI。\n"
+                "# 能力素材\n熟练使用 Python 和 FastAPI。\n"
                 "# 项目经历\n使用 Python 完成后端系统开发。",
                 "text/markdown",
             )
@@ -123,4 +123,25 @@ def test_deleting_profile_cascades_match(test_settings) -> None:
         match_id = _create_match(client, profile_id)
         response = client.delete(f"/profiles/{profile_id}")
         assert response.status_code == 200
+        assert client.get(f"/matches/{match_id}").status_code == 404
+
+
+def test_match_can_be_deleted_immediately_after_creation(test_settings) -> None:
+    app = create_app(test_settings)
+    with TestClient(app) as client:
+        profile_id = _create_profile(client)
+        response = client.post(
+            "/matches",
+            json={
+                "profile_task_id": profile_id,
+                "title": "立即删除匹配",
+                "jd_text": "后端工程师\n任职要求：熟悉 Python 和 FastAPI。",
+            },
+        )
+        assert response.status_code == 202, response.text
+        match_id = response.json()["match_id"]
+
+        deleted = client.delete(f"/matches/{match_id}")
+
+        assert deleted.status_code == 200, deleted.text
         assert client.get(f"/matches/{match_id}").status_code == 404

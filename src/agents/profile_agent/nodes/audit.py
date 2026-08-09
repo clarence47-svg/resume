@@ -25,13 +25,7 @@ def audit_profile(state: dict) -> dict:
 
 
 def _iter_claims(result: ProfileResult):
-    yield from result.personal_introduction.core_strengths
-    yield from result.personal_introduction.work_characteristics
-    yield from result.personal_introduction.career_direction
-    yield from result.professional_introduction.knowledge_domains
-    yield from result.professional_introduction.skills
-    yield from result.professional_introduction.research_interests
-    yield from result.professional_introduction.certifications
+    yield from result.personal_introduction.items
     for section in (
         result.project_experiences,
         result.competition_experiences,
@@ -50,7 +44,6 @@ def assemble_profile(state: dict) -> dict:
     result = ProfileResult(
         task_id=state["task_id"],
         personal_introduction=data.get("personal_introduction", {}),
-        professional_introduction=data.get("professional_introduction", {}),
         project_experiences=data.get("project_experiences", {}),
         competition_experiences=data.get("competition_experiences", {}),
         internship_experiences=data.get("internship_experiences", {}),

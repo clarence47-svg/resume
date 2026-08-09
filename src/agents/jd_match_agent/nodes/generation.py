@@ -1,5 +1,12 @@
 import json
-from profile.models import EvidenceRef, FactCategory, ProfileFact, SectionStatus
+from profile.models import (
+    PROFILE_SECTION_CATEGORIES,
+    EvidenceRef,
+    FactCategory,
+    ProfileFact,
+    SectionStatus,
+)
+from profile.section_documents import extract_document_fact_ids
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -9,6 +16,7 @@ from core.model import get_match_model
 from core.settings import get_settings
 from matching.models import (
     JDAnalysis,
+    MaterialRelevanceScore,
     RequirementMatch,
     TailoredCopyUnit,
     TailoredEducationEntry,
@@ -18,7 +26,7 @@ from matching.models import (
     TailoredTextSection,
 )
 
-SECTION_NAMES = [category.value for category in FactCategory]
+SECTION_NAMES = [category.value for category in PROFILE_SECTION_CATEGORIES]
 
 
 async def generate_section(state: dict) -> dict:
@@ -27,11 +35,26 @@ async def generate_section(state: dict) -> dict:
     analysis = JDAnalysis.model_validate(state["jd_analysis"])
     settings = get_settings()
     warnings: list[str] = []
+    profile_markdown = state.get("tailored_profile_sections", {}).get(section_name, "")
+    document_fact_ids = extract_document_fact_ids(profile_markdown)
+    section_facts = [fact for fact in facts if fact.id in document_fact_ids]
+    selected_fact_ids = [
+        fact_id
+        for fact_id in state.get("selected_fact_ids", {}).get(section_name, [])
+        if fact_id in document_fact_ids
+    ]
+    selected_entries = []
+    for selected in state.get("selected_entries", {}).get(section_name, []):
+        fact_ids = [fact_id for fact_id in selected["fact_ids"] if fact_id in document_fact_ids]
+        if fact_ids:
+            selected_entries.append({**selected, "fact_ids": fact_ids})
     context = {
         "jd_analysis": analysis.model_dump(mode="json"),
-        "facts": [fact.model_dump(mode="json") for fact in facts],
-        "selected_fact_ids": state.get("selected_fact_ids", {}).get(section_name, []),
-        "selected_entries": state.get("selected_entries", {}).get(section_name, []),
+        "job_research": state.get("job_research", {}),
+        "profile_section_markdown": profile_markdown,
+        "facts": [fact.model_dump(mode="json") for fact in section_facts],
+        "selected_fact_ids": selected_fact_ids,
+        "selected_entries": selected_entries,
         "requirement_matches": state.get("requirement_matches", []),
     }
     draft = None
@@ -53,7 +76,7 @@ async def generate_section(state: dict) -> dict:
                 raise
             warnings.append(f"{section_name} 文案生成失败，已使用规则回退：{exc}")
     if draft is None:
-        draft = _heuristic_draft(section_name, context, facts)
+        draft = _heuristic_draft(section_name, context, section_facts)
     section = _materialize(section_name, draft, state, facts)
     return {
         "section_outputs": [{"section": section_name, "data": section.model_dump(mode="json")}],
@@ -63,7 +86,7 @@ async def generate_section(state: dict) -> dict:
 
 def _heuristic_draft(section_name: str, context: dict, facts: list[ProfileFact]):
     fact_map = {fact.id: fact for fact in facts}
-    if section_name in {FactCategory.PERSONAL.value, FactCategory.PROFESSIONAL.value}:
+    if section_name == FactCategory.PERSONAL.value:
         selected = [
             fact_map[fact_id] for fact_id in context["selected_fact_ids"] if fact_id in fact_map
         ]
@@ -105,7 +128,7 @@ def _heuristic_draft(section_name: str, context: dict, facts: list[ProfileFact])
                     CopyUnitDraft(content=fact.statement, source_fact_ids=[fact.id])
                     for fact in source_facts[:4]
                 ],
-                selected_reason="与岗位要求存在事实支持的能力重合。",
+                selected_reason=_selected_reason(selected["fact_ids"], context),
             )
         )
     overview_ids = [fact_id for item in context["selected_entries"] for fact_id in item["fact_ids"]]
@@ -129,9 +152,15 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
         ]
     }
     relevance = state.get("fact_relevance", {})
-    if section_name in {FactCategory.PERSONAL.value, FactCategory.PROFESSIONAL.value}:
-        overview = _unit(draft.overview, fact_map, match_map, relevance)
-        bullets = [_unit(item, fact_map, match_map, relevance) for item in draft.bullets]
+    material_scores = {
+        fact_id: MaterialRelevanceScore.model_validate(value)
+        for fact_id, value in state.get("material_scores", {}).items()
+    }
+    if section_name == FactCategory.PERSONAL.value:
+        overview = _unit(draft.overview, fact_map, match_map, relevance, material_scores)
+        bullets = [
+            _unit(item, fact_map, match_map, relevance, material_scores) for item in draft.bullets
+        ]
         status = (
             SectionStatus.COMPLETE
             if overview.source_fact_ids
@@ -157,9 +186,12 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
                     degree=raw.get("degree"),
                     major=raw.get("major"),
                     period=raw.get("period"),
-                    tailored_summary=_unit(item.summary, fact_map, match_map, relevance),
+                    tailored_summary=_unit(
+                        item.summary, fact_map, match_map, relevance, material_scores
+                    ),
                     bullets=[
-                        _unit(value, fact_map, match_map, relevance) for value in item.bullets
+                        _unit(value, fact_map, match_map, relevance, material_scores)
+                        for value in item.bullets
                     ],
                     relevance_score=source["relevance_score"],
                     evidence_refs=_fact_evidence(source["fact_ids"], fact_map),
@@ -167,7 +199,7 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
             )
         return TailoredEducationSection(
             status=SectionStatus.COMPLETE if entries else SectionStatus.INSUFFICIENT_EVIDENCE,
-            overview=_unit(draft.overview, fact_map, match_map, relevance),
+            overview=_unit(draft.overview, fact_map, match_map, relevance, material_scores),
             entries=entries,
         )
     entries = []
@@ -176,14 +208,20 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
         if source is None:
             continue
         raw = source["entry"]
+        summary = _unit(item.summary, fact_map, match_map, relevance, material_scores)
+        _preserve_core_summary(summary, raw.get("summary"))
         entries.append(
             TailoredExperienceEntry(
                 name=raw["name"],
                 organization=raw.get("organization"),
                 period=raw.get("period"),
                 role=raw.get("role"),
-                tailored_summary=_unit(item.summary, fact_map, match_map, relevance),
-                bullets=[_unit(value, fact_map, match_map, relevance) for value in item.bullets],
+                technologies=raw.get("technologies", []),
+                tailored_summary=summary,
+                bullets=[
+                    _unit(value, fact_map, match_map, relevance, material_scores)
+                    for value in item.bullets
+                ],
                 selected_reason=item.selected_reason,
                 relevance_score=source["relevance_score"],
                 evidence_refs=_fact_evidence(source["fact_ids"], fact_map),
@@ -191,12 +229,12 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
         )
     return TailoredExperienceSection(
         status=SectionStatus.COMPLETE if entries else SectionStatus.INSUFFICIENT_EVIDENCE,
-        overview=_unit(draft.overview, fact_map, match_map, relevance),
+        overview=_unit(draft.overview, fact_map, match_map, relevance, material_scores),
         entries=entries,
     )
 
 
-def _unit(draft, fact_map, match_map, relevance) -> TailoredCopyUnit:
+def _unit(draft, fact_map, match_map, relevance, material_scores) -> TailoredCopyUnit:
     fact_ids = [fact_id for fact_id in draft.source_fact_ids if fact_id in fact_map]
     matched_requirement_ids = list(
         dict.fromkeys(
@@ -219,6 +257,29 @@ def _unit(draft, fact_map, match_map, relevance) -> TailoredCopyUnit:
         evidence_refs=_fact_evidence(fact_ids, fact_map),
         matched_requirement_ids=matched_requirement_ids,
         relevance_score=score,
+        relevance_breakdown=_aggregate_relevance(fact_ids, material_scores),
+    )
+
+
+def _aggregate_relevance(
+    fact_ids: list[str], material_scores: dict[str, MaterialRelevanceScore]
+) -> MaterialRelevanceScore:
+    scores = [material_scores[fact_id] for fact_id in fact_ids if fact_id in material_scores]
+    if not scores:
+        return MaterialRelevanceScore()
+    capability_ids = {
+        capability_id for score in scores for capability_id in score.capability_scores
+    }
+    return MaterialRelevanceScore(
+        direct_match=max(item.direct_match for item in scores),
+        transferable=max(item.transferable for item in scores),
+        adjacent=max(item.adjacent for item in scores),
+        impact=max(item.impact for item in scores),
+        overall=max(item.overall for item in scores),
+        capability_scores={
+            capability_id: max(item.capability_scores.get(capability_id, 0) for item in scores)
+            for capability_id in capability_ids
+        },
     )
 
 
@@ -230,3 +291,24 @@ def _fact_evidence(fact_ids: list[str], fact_map) -> list[EvidenceRef]:
         for evidence in fact_map[fact_id].evidence_refs
     }
     return list(items.values())
+
+
+def _selected_reason(fact_ids: list[str], context: dict) -> str:
+    requirement_map = {
+        item["id"]: item["text"] for item in context["jd_analysis"].get("requirements", [])
+    }
+    matched = [
+        requirement_map[item["requirement_id"]]
+        for item in context.get("requirement_matches", [])
+        if item["requirement_id"] in requirement_map
+        and set(item.get("source_fact_ids", [])).intersection(fact_ids)
+    ]
+    if matched:
+        return f"该经历能够支撑岗位核心能力：{'；'.join(matched[:2])}。"
+    return "该经历与岗位职责存在事实支持的能力重合。"
+
+
+def _preserve_core_summary(unit: TailoredCopyUnit, source_summary: str | None) -> None:
+    core = (source_summary or "").strip().rstrip("。")
+    if core and core.casefold() not in unit.content.casefold():
+        unit.content = f"{core}；{unit.content}"

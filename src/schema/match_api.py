@@ -32,6 +32,8 @@ class MatchTaskCreated(BaseModel):
 class MatchTaskSummary(BaseModel):
     id: str
     profile_task_id: str
+    job_id: str | None = None
+    batch_id: str | None = None
     title: str
     status: MatchTaskStatus
     stage: str

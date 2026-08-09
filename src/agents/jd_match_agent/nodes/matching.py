@@ -77,7 +77,7 @@ def _materialize(analysis: JDAnalysis, facts: list[ProfileFact], drafts) -> list
 def _heuristic_match(requirement, facts: list[ProfileFact]) -> RequirementMatch:
     candidates = (
         facts
-        if requirement.category == FactCategory.PERSONAL
+        if requirement.category in {FactCategory.PERSONAL, FactCategory.CAPABILITY}
         else [fact for fact in facts if fact.category == requirement.category]
     )
     keywords = requirement.keywords or _tokens(requirement.text)

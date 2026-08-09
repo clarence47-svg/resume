@@ -1,4 +1,5 @@
 import logging
+from profile.section_documents import SECTION_SNAPSHOT_KEY
 
 from matching.models import JDMatchResult, MatchVersionSource
 from schema.match_api import MatchTaskStatus
@@ -26,12 +27,15 @@ class MatchPipeline:
             error=None,
         )
         try:
+            profile_snapshot = dict(task.profile_result_snapshot)
+            profile_sections = profile_snapshot.pop(SECTION_SNAPSHOT_KEY, {})
             output = await self.graph.ainvoke(
                 {
                     "match_id": match_id,
                     "profile_task_id": task.profile_task_id,
                     "jd_text": task.jd_text,
-                    "profile_result": task.profile_result_snapshot,
+                    "profile_result": profile_snapshot,
+                    "profile_sections": profile_sections,
                     "facts": task.facts_snapshot,
                     "conflicts": task.conflicts_snapshot,
                     "section_outputs": [],

@@ -13,7 +13,7 @@ def test_match_uses_immutable_profile_snapshot(test_settings) -> None:
             files={
                 "files": (
                     "resume.md",
-                    "# 专业介绍\n使用 Python 开发服务。",
+                    "# 能力素材\n使用 Python 开发服务。",
                     "text/markdown",
                 )
             },

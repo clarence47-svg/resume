@@ -1,14 +1,20 @@
 from pathlib import Path
-from profile.models import ConflictRecord
+from profile.exporters.docx import export_docx
+from profile.exporters.markdown import export_markdown
+from profile.models import FactCategory
+from profile.section_documents import SECTION_FILENAMES, write_profile_section_documents
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
 from ingestion.validation import FileValidationError, validate_file
+from jobs.application_runner import ApplicationRunner
+from jobs.match_runner import MatchJobRunner
 from jobs.runner import JobAction, JobRunner
 from schema.profile_api import (
     DeleteResponse,
+    DocumentsAdded,
     DocumentStatus,
     DocumentSummary,
     FactsResponse,
@@ -21,11 +27,15 @@ from schema.profile_api import (
     TaskSummary,
 )
 from service.dependencies import (
+    get_application_runner,
+    get_career_repository,
     get_job_runner,
+    get_match_job_runner,
     get_match_repository,
     get_repository,
     get_storage,
 )
+from storage.career_repositories import CareerRepository
 from storage.files import FileStorage
 from storage.repositories import MatchRepository, ProfileRepository
 
@@ -42,7 +52,6 @@ ACTIVE_STATUSES = {
 @router.post("", response_model=TaskCreated, status_code=status.HTTP_202_ACCEPTED)
 async def create_profile(
     files: list[UploadFile] = File(...),
-    review_mode: ReviewMode = Form(ReviewMode.AUTO),
     title: str = Form(""),
     repository: ProfileRepository = Depends(get_repository),
     storage: FileStorage = Depends(get_storage),
@@ -55,7 +64,7 @@ async def create_profile(
         raise HTTPException(status_code=400, detail=f"一次最多上传 {settings.max_files} 个文件。")
     task_id = str(uuid4())
     task_title = title.strip() or f"画像任务 {task_id[:8]}"
-    repository.create_task(task_id, task_title, review_mode)
+    repository.create_task(task_id, task_title, ReviewMode.AUTO)
     valid_count = 0
     total_size = 0
     errors: list[str] = []
@@ -135,7 +144,100 @@ def get_profile_task(
             )
             for document in task.documents
         ],
-        conflicts=[ConflictRecord.model_validate(item) for item in task.conflicts],
+        conflicts=[],
+    )
+
+
+@router.post(
+    "/{task_id}/documents",
+    response_model=DocumentsAdded,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def add_profile_documents(
+    task_id: str,
+    files: list[UploadFile] = File(...),
+    repository: ProfileRepository = Depends(get_repository),
+    storage: FileStorage = Depends(get_storage),
+    runner: JobRunner = Depends(get_job_runner),
+) -> DocumentsAdded:
+    task = _require_task(repository, task_id)
+    if task.status in ACTIVE_STATUSES:
+        raise HTTPException(status_code=409, detail="任务正在处理中，请完成后再补充资料。")
+    if not files:
+        raise HTTPException(status_code=400, detail="至少上传一个文件。")
+    settings = storage.settings
+    existing = repository.get_documents(task_id)
+    stored_documents = [document for document in existing if document.stored_path]
+    if len(stored_documents) + len(files) > settings.max_files:
+        raise HTTPException(
+            status_code=400,
+            detail=f"画像池最多保存 {settings.max_files} 个有效文件。",
+        )
+    total_size = sum(document.size_bytes for document in stored_documents)
+    digests = {document.sha256 for document in stored_documents if document.sha256}
+    added_count = 0
+    skipped_count = 0
+    errors: list[str] = []
+    for upload in files:
+        original_name = upload.filename or "document"
+        extension = Path(original_name).suffix.lower()
+        try:
+            document_id, path, size_bytes, digest = await storage.save_upload(task_id, upload)
+            if digest in digests:
+                path.unlink(missing_ok=True)
+                skipped_count += 1
+                continue
+            total_size += size_bytes
+            if total_size > settings.max_total_size_mb * 1024 * 1024:
+                path.unlink(missing_ok=True)
+                raise FileValidationError(
+                    f"画像池总大小超过 {settings.max_total_size_mb} MB 限制。"
+                )
+            media_type = validate_file(path, original_name, settings)
+            repository.add_document(
+                document_id=document_id,
+                task_id=task_id,
+                original_name=original_name,
+                extension=extension,
+                size_bytes=size_bytes,
+                stored_path=str(path),
+                media_type=media_type or upload.content_type,
+                sha256=digest,
+            )
+            digests.add(digest)
+            added_count += 1
+        except Exception as exc:
+            errors.append(f"{original_name}: {exc}")
+            repository.add_document(
+                document_id=str(uuid4()),
+                task_id=task_id,
+                original_name=original_name,
+                extension=extension,
+                size_bytes=0,
+                stored_path=None,
+                media_type=upload.content_type,
+                sha256=None,
+                status=DocumentStatus.FAILED,
+                error=str(exc),
+            )
+    if added_count == 0:
+        detail = "上传文件均已存在于画像池。" if skipped_count else "; ".join(errors)
+        raise HTTPException(status_code=409 if skipped_count else 400, detail=detail)
+    repository.increment_attempt(task_id)
+    repository.update_task(
+        task_id,
+        status=TaskStatus.QUEUED.value,
+        stage="queued",
+        progress=0,
+        error="; ".join(errors) if errors else None,
+    )
+    await runner.enqueue(task_id, JobAction.FULL)
+    return DocumentsAdded(
+        task_id=task_id,
+        status=TaskStatus.QUEUED,
+        added_count=added_count,
+        skipped_count=skipped_count,
+        errors=errors,
     )
 
 
@@ -226,6 +328,36 @@ def get_result(
     return ResultResponse(result=result)
 
 
+@router.get("/{task_id}/sections/{section_name}")
+def export_profile_section(
+    task_id: str,
+    section_name: str,
+    repository: ProfileRepository = Depends(get_repository),
+    storage: FileStorage = Depends(get_storage),
+):
+    _require_task(repository, task_id)
+    try:
+        category = FactCategory(section_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="画像维度不存在。") from exc
+    if category.value not in SECTION_FILENAMES:
+        raise HTTPException(status_code=404, detail="画像维度不存在。")
+    result = repository.get_result(task_id)
+    if result is None:
+        raise HTTPException(status_code=409, detail="画像尚未生成。")
+    paths = write_profile_section_documents(
+        result,
+        repository.get_facts(task_id),
+        storage.profile_sections_dir(task_id),
+    )
+    path = paths[category.value]
+    return FileResponse(
+        path,
+        media_type="text/markdown",
+        filename=SECTION_FILENAMES[category.value],
+    )
+
+
 @router.get("/{task_id}/export")
 def export_result(
     task_id: str,
@@ -233,10 +365,15 @@ def export_result(
     repository: ProfileRepository = Depends(get_repository),
 ):
     _require_task(repository, task_id)
+    result = repository.get_result(task_id)
+    if result is None:
+        raise HTTPException(status_code=409, detail="画像尚未生成。")
     markdown_path, docx_path = repository.get_result_paths(task_id)
     if format == "md" and markdown_path:
+        export_markdown(result, Path(markdown_path))
         return FileResponse(markdown_path, media_type="text/markdown", filename="profile.md")
     if format == "docx" and docx_path:
+        export_docx(result, Path(docx_path))
         return FileResponse(
             docx_path,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -246,17 +383,34 @@ def export_result(
 
 
 @router.delete("/{task_id}", response_model=DeleteResponse)
-def delete_profile(
+async def delete_profile(
     task_id: str,
     repository: ProfileRepository = Depends(get_repository),
     match_repository: MatchRepository = Depends(get_match_repository),
     storage: FileStorage = Depends(get_storage),
+    runner: JobRunner = Depends(get_job_runner),
+    match_runner: MatchJobRunner = Depends(get_match_job_runner),
+    career_repository: CareerRepository = Depends(get_career_repository),
+    application_runner: ApplicationRunner = Depends(get_application_runner),
 ) -> DeleteResponse:
-    task = _require_task(repository, task_id)
-    if task.status in ACTIVE_STATUSES:
-        raise HTTPException(status_code=409, detail="任务处理中，暂不能删除。")
-    for match_id in match_repository.list_ids_for_profile(task_id):
+    _require_task(repository, task_id)
+    await runner.cancel(task_id)
+    match_ids = match_repository.list_ids_for_profile(task_id)
+    for match_id in match_ids:
+        await match_runner.cancel(match_id)
         storage.delete_match_files(match_id)
+    jobs = career_repository.list_jobs(profile_task_id=task_id)
+    job_ids = {job.id for job in jobs}
+    for application in career_repository.list_applications():
+        if application.job_id in job_ids:
+            await application_runner.cancel(application.id)
+            storage.delete_application_files(application.id)
+    for job in jobs:
+        for kit in career_repository.list_interview_kits(job.id):
+            storage.delete_interview_files(kit.id)
+        storage.delete_job_files(job.id)
+    for campaign in career_repository.list_campaigns(task_id):
+        storage.delete_campaign_files(campaign.id)
     storage.delete_task_files(task_id)
     repository.delete_task(task_id)
     return DeleteResponse()

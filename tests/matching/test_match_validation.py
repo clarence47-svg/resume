@@ -21,7 +21,6 @@ def _result(unit: TailoredCopyUnit) -> JDMatchResult:
             required_skills=["Python"], preferred_skills=["Docker"], keywords=["Python", "Docker"]
         ),
         personal_introduction=TailoredTextSection(status=SectionStatus.COMPLETE, overview=unit),
-        professional_introduction=TailoredTextSection(overview=empty),
         project_experiences=TailoredExperienceSection(overview=empty),
         competition_experiences=TailoredExperienceSection(overview=empty),
         internship_experiences=TailoredExperienceSection(overview=empty),
@@ -35,7 +34,7 @@ def test_edit_rejects_unsupported_numbers_and_skills() -> None:
     )
     fact = ProfileFact(
         id="fact",
-        category=FactCategory.PROFESSIONAL,
+        category=FactCategory.CAPABILITY,
         statement="使用 Python 开发系统",
         evidence_refs=[evidence],
     )
@@ -60,7 +59,7 @@ def test_edit_preserves_evidence_metadata() -> None:
     )
     fact = ProfileFact(
         id="fact",
-        category=FactCategory.PROFESSIONAL,
+        category=FactCategory.CAPABILITY,
         statement="使用 Python 开发系统",
         evidence_refs=[evidence],
     )

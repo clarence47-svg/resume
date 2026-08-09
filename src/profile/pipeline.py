@@ -1,5 +1,6 @@
 import logging
 from profile.models import ConflictRecord, ProfileFact, ProfileResult
+from profile.section_documents import write_profile_section_documents
 
 from langgraph.types import Command
 
@@ -160,6 +161,11 @@ class ProfilePipeline:
             result,
             export_paths["markdown"],
             export_paths["docx"],
+        )
+        write_profile_section_documents(
+            result,
+            self.repository.get_facts(task_id),
+            self.ingestion.storage.profile_sections_dir(task_id),
         )
         status = TaskStatus.PARTIAL_SUCCESS if parse_errors else TaskStatus.COMPLETED
         self.repository.update_task(

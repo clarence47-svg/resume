@@ -8,8 +8,7 @@ from matching.models import (
 )
 
 SECTION_TITLES = {
-    "personal_introduction": "个人介绍",
-    "professional_introduction": "专业介绍",
+    "personal_introduction": "个人信息",
     "project_experiences": "项目经历",
     "competition_experiences": "比赛经历",
     "internship_experiences": "实习经历",
@@ -27,9 +26,61 @@ def export_match_markdown(result: JDMatchResult, path: Path) -> Path:
         f"- 匹配关键词：{'、'.join(result.keyword_coverage.matched) or '无'}",
         f"- 缺失关键词：{'、'.join(result.keyword_coverage.missing) or '无'}",
         "",
-        "## 匹配分析",
+        "## 岗位说明",
+        "",
+        result.job_research.role_summary,
+        "",
+        f"- 联网研究状态：{result.job_research.status.value}",
+        f"- 核心能力：{'、'.join(result.job_research.core_capabilities) or '未识别'}",
+        f"- 常见职责：{'；'.join(result.job_research.typical_responsibilities) or '未识别'}",
+        f"- 常见工具：{'、'.join(result.job_research.common_tools) or '未识别'}",
+        f"- 市场关键词：{'、'.join(result.job_research.market_keywords) or '未识别'}",
+        "",
+        "## 岗位动态能力维度",
         "",
     ]
+    lines.extend(
+        f"- {item.name}：{item.description or '根据当前 JD 动态生成'}"
+        for item in result.jd_analysis.capability_dimensions
+    )
+    if not result.jd_analysis.capability_dimensions:
+        lines.append("- 当前 JD 未识别到能力维度。")
+    lines.extend(
+        [
+            "",
+            "## 经历相关度矩阵",
+            "",
+        ]
+    )
+    for row in result.experience_matrix:
+        selected = "已选择" if row.selected else "候选"
+        lines.append(
+            f"- [{selected}] {row.name}：综合 {row.relevance.overall:.1f}；"
+            f"直接 {row.relevance.direct_match:.1f}；迁移 {row.relevance.transferable:.1f}；"
+            f"相邻 {row.relevance.adjacent:.1f}；影响 {row.relevance.impact:.1f}"
+        )
+    if not result.experience_matrix:
+        lines.append("- 当前画像没有可参与排序的项目、比赛或实习经历。")
+    lines.extend(
+        [
+            "",
+            "### 参考来源",
+            "",
+        ]
+    )
+    lines.extend(
+        f"- [{source.title}]({source.url})：{source.snippet}"
+        for source in result.job_research.sources
+    )
+    if not result.job_research.sources:
+        lines.append("- 未获取到联网搜索来源。")
+    lines.extend(
+        [
+            "",
+            "## 匹配分析",
+            "",
+        ]
+    )
     lines.extend(f"- 优势：{item}" for item in result.strengths)
     lines.extend(f"- 缺口：{item}" for item in result.gaps)
     lines.append("")
@@ -54,6 +105,23 @@ def _section(
         for entry in section.entries:
             name = getattr(entry, "name", None) or getattr(entry, "institution", "")
             lines.extend(["", f"### {name}", "", entry.tailored_summary.content, ""])
+            if hasattr(entry, "organization"):
+                lines.extend(
+                    [
+                        f"- 单位/组织：{entry.organization or '资料未提供'}",
+                        f"- 时间：{entry.period or '资料未提供'}",
+                        f"- 角色：{entry.role or '资料未提供'}",
+                        f"- 核心技术：{'、'.join(entry.technologies) or '资料未提供'}",
+                    ]
+                )
+            else:
+                lines.extend(
+                    [
+                        f"- 学历：{entry.degree or '资料未提供'}",
+                        f"- 专业：{entry.major or '资料未提供'}",
+                        f"- 时间：{entry.period or '资料未提供'}",
+                    ]
+                )
             lines.extend(f"- {item.content}" for item in entry.bullets)
     lines.append("")
     return lines

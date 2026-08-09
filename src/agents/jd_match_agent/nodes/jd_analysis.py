@@ -7,10 +7,19 @@ from agents.jd_match_agent.prompts.jd_analysis import (
     JD_ANALYSIS_SYSTEM_PROMPT,
     jd_analysis_user_prompt,
 )
-from agents.jd_match_agent.schemas import JDAnalysisDraft, JDRequirementDraft
+from agents.jd_match_agent.schemas import (
+    CapabilityDimensionDraft,
+    JDAnalysisDraft,
+    JDRequirementDraft,
+)
 from core.model import get_match_model
 from core.settings import get_settings
-from matching.models import JDAnalysis, JDRequirement, RequirementPriority
+from matching.models import (
+    CapabilityDimension,
+    JDAnalysis,
+    JDRequirement,
+    RequirementPriority,
+)
 
 PRIORITY_WEIGHTS = {
     RequirementPriority.REQUIRED: 3.0,
@@ -43,6 +52,15 @@ KNOWN_SKILLS = (
     "大模型",
     "数据分析",
     "算法",
+)
+CAPABILITY_GROUPS = (
+    ("编程与开发", ("Python", "Java", "C++", "Go", "JavaScript", "TypeScript", "开发", "编码")),
+    ("框架与工程", ("FastAPI", "Django", "Flask", "Spring", "Vue", "React", "架构", "系统")),
+    ("数据与存储", ("SQL", "PostgreSQL", "MySQL", "Redis", "数据分析", "数据库", "数据")),
+    ("云端与交付", ("Docker", "Kubernetes", "Linux", "Git", "DevOps", "云", "部署", "交付")),
+    ("算法与 AI", ("机器学习", "深度学习", "大模型", "算法", "模型", "AIGC", "LLM")),
+    ("产品与业务", ("产品", "用户", "需求", "运营", "增长", "商业", "行业", "市场")),
+    ("协作与推动", ("沟通", "协作", "项目管理", "推动", "团队", "跨部门", "领导")),
 )
 
 
@@ -93,6 +111,7 @@ def _materialize(draft: JDAnalysisDraft, jd_text: str) -> JDAnalysis:
             )
             for item in fallback.requirements
         ]
+    dimensions = _materialize_dimensions(draft.capability_dimensions, requirements, jd_text)
     return JDAnalysis(
         role_title=draft.role_title.strip() or "目标岗位",
         seniority=draft.seniority,
@@ -103,6 +122,7 @@ def _materialize(draft: JDAnalysisDraft, jd_text: str) -> JDAnalysis:
         education_requirements=_dedupe(draft.education_requirements),
         keywords=_dedupe(draft.keywords),
         requirements=requirements,
+        capability_dimensions=dimensions,
     )
 
 
@@ -142,7 +162,90 @@ def _heuristic_analysis(jd_text: str) -> JDAnalysisDraft:
         education_requirements=education,
         keywords=all_keywords,
         requirements=requirements[:40],
+        capability_dimensions=_heuristic_dimension_drafts(jd_text, requirements),
     )
+
+
+def _materialize_dimensions(
+    drafts: list[CapabilityDimensionDraft],
+    requirements: list[JDRequirement],
+    jd_text: str,
+) -> list[CapabilityDimension]:
+    source = drafts or _heuristic_dimension_drafts(jd_text, requirements)
+    output: list[CapabilityDimension] = []
+    seen: set[str] = set()
+    for draft in source:
+        name = draft.name.strip()
+        normalized = name.casefold()
+        if not name or normalized in seen:
+            continue
+        seen.add(normalized)
+        keywords = _dedupe(draft.keywords or _extract_keywords(draft.description))
+        match_tokens = [*keywords, *_extract_keywords(name)]
+        requirement_ids = [
+            item.id for item in requirements if _dimension_matches_requirement(match_tokens, item)
+        ]
+        weight = sum(item.weight for item in requirements if item.id in set(requirement_ids)) or 1
+        output.append(
+            CapabilityDimension(
+                name=name,
+                description=draft.description.strip(),
+                keywords=keywords,
+                requirement_ids=requirement_ids,
+                weight=weight,
+            )
+        )
+        if len(output) == 6:
+            break
+    return output
+
+
+def _heuristic_dimension_drafts(
+    jd_text: str,
+    requirements: list[JDRequirementDraft] | list[JDRequirement],
+) -> list[CapabilityDimensionDraft]:
+    dimensions: list[CapabilityDimensionDraft] = []
+    for name, triggers in CAPABILITY_GROUPS:
+        matched = [token for token in triggers if token.casefold() in jd_text.casefold()]
+        if matched:
+            dimensions.append(
+                CapabilityDimensionDraft(
+                    name=name,
+                    description=f"岗位对{'、'.join(matched[:4])}相关能力的要求。",
+                    keywords=matched,
+                )
+            )
+    categories = {item.category for item in requirements}
+    supplements = (
+        (FactCategory.PROJECT, "项目落地", ("项目", "落地", "成果")),
+        (FactCategory.INTERNSHIP, "岗位实践", ("实习", "工作经验", "岗位")),
+        (FactCategory.EDUCATION, "教育背景", ("学历", "专业", "本科", "硕士", "博士")),
+    )
+    for category, name, triggers in supplements:
+        if category in categories and not any(item.name == name for item in dimensions):
+            dimensions.append(
+                CapabilityDimensionDraft(
+                    name=name,
+                    description=f"JD 中与{name}相关的要求。",
+                    keywords=[token for token in triggers if token in jd_text],
+                )
+            )
+    if not dimensions:
+        dimensions.append(
+            CapabilityDimensionDraft(
+                name="岗位核心要求",
+                description="根据当前 JD 的职责与任职要求动态生成。",
+                keywords=_extract_keywords(jd_text)[:12],
+            )
+        )
+    return dimensions[:6]
+
+
+def _dimension_matches_requirement(tokens: list[str], requirement: JDRequirement) -> bool:
+    if not tokens:
+        return False
+    searchable = f"{requirement.text} {' '.join(requirement.keywords)}".casefold()
+    return any(token.casefold() in searchable for token in tokens)
 
 
 def _priority(text: str) -> RequirementPriority:
@@ -164,7 +267,7 @@ def _category(text: str) -> FactCategory:
         return FactCategory.PROJECT
     if any(token in text for token in ("沟通", "协作", "责任", "主动", "学习能力")):
         return FactCategory.PERSONAL
-    return FactCategory.PROFESSIONAL
+    return FactCategory.CAPABILITY
 
 
 def _extract_keywords(text: str) -> list[str]:

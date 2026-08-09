@@ -13,7 +13,7 @@ class ProfileClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def create_profile(self, files, review_mode: str = "auto", title: str = "") -> dict:
+    def create_profile(self, files, title: str = "") -> dict:
         payload = []
         opened: list[BinaryIO] = []
         try:
@@ -28,7 +28,7 @@ class ProfileClient:
                 "POST",
                 "/profiles",
                 files=payload,
-                data={"review_mode": review_mode, "title": title},
+                data={"title": title},
             ).json()
         finally:
             for handle in opened:
@@ -36,6 +36,16 @@ class ProfileClient:
 
     def list_profiles(self) -> list[dict]:
         return self._request("GET", "/profiles").json()
+
+    def add_documents(self, task_id: str, files) -> dict:
+        payload = []
+        for file in files:
+            payload.append(("files", (file.name, file.getvalue(), file.type)))
+        return self._request(
+            "POST",
+            f"/profiles/{task_id}/documents",
+            files=payload,
+        ).json()
 
     def get_task(self, task_id: str) -> dict:
         return self._request("GET", f"/profiles/{task_id}").json()
@@ -62,6 +72,9 @@ class ProfileClient:
         return self._request(
             "GET", f"/profiles/{task_id}/export", params={"format": format}
         ).content
+
+    def download_section(self, task_id: str, section_name: str) -> bytes:
+        return self._request("GET", f"/profiles/{task_id}/sections/{section_name}").content
 
     def delete(self, task_id: str) -> dict:
         return self._request("DELETE", f"/profiles/{task_id}").json()

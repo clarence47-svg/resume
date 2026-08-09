@@ -4,26 +4,10 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from core.settings import get_settings
+from storage import orm as storage_orm
 from storage.db import Base
-from storage.orm import (
-    DocumentORM,
-    FactORM,
-    MatchResultORM,
-    MatchResultVersionORM,
-    MatchTaskORM,
-    ProfileResultORM,
-    ProfileTaskORM,
-)
 
-REGISTERED_MODELS = (
-    DocumentORM,
-    FactORM,
-    ProfileResultORM,
-    ProfileTaskORM,
-    MatchTaskORM,
-    MatchResultORM,
-    MatchResultVersionORM,
-)
+REGISTERED_MODELS = storage_orm
 
 
 config = context.config

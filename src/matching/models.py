@@ -19,6 +19,18 @@ class SupportLevel(StrEnum):
     NONE = "none"
 
 
+class RequirementOrigin(StrEnum):
+    JD = "jd"
+    MARKET_RESEARCH = "market_research"
+
+
+class ResearchStatus(StrEnum):
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    UNAVAILABLE = "unavailable"
+    DISABLED = "disabled"
+
+
 class MatchVersionSource(StrEnum):
     GENERATED = "generated"
     USER_EDIT = "user_edit"
@@ -33,6 +45,36 @@ class JDRequirement(BaseModel):
     priority: RequirementPriority
     weight: float = Field(gt=0)
     keywords: list[str] = Field(default_factory=list)
+    origin: RequirementOrigin = RequirementOrigin.JD
+    source_urls: list[str] = Field(default_factory=list)
+
+
+class CapabilityDimension(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    name: str
+    description: str = ""
+    keywords: list[str] = Field(default_factory=list)
+    requirement_ids: list[str] = Field(default_factory=list)
+    weight: float = Field(default=1, gt=0)
+
+
+class JobResearchSource(BaseModel):
+    title: str
+    url: str
+    snippet: str = ""
+    query: str = ""
+
+
+class JobResearch(BaseModel):
+    role_title: str = "目标岗位"
+    role_summary: str = "未获得岗位市场研究信息。"
+    core_capabilities: list[str] = Field(default_factory=list)
+    typical_responsibilities: list[str] = Field(default_factory=list)
+    common_tools: list[str] = Field(default_factory=list)
+    market_keywords: list[str] = Field(default_factory=list)
+    search_queries: list[str] = Field(default_factory=list)
+    sources: list[JobResearchSource] = Field(default_factory=list)
+    status: ResearchStatus = ResearchStatus.UNAVAILABLE
 
 
 class JDAnalysis(BaseModel):
@@ -45,6 +87,7 @@ class JDAnalysis(BaseModel):
     education_requirements: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     requirements: list[JDRequirement] = Field(default_factory=list)
+    capability_dimensions: list[CapabilityDimension] = Field(default_factory=list)
 
 
 class RequirementMatch(BaseModel):
@@ -68,6 +111,23 @@ class DimensionMatch(BaseModel):
     missing_requirement_ids: list[str] = Field(default_factory=list)
 
 
+class MaterialRelevanceScore(BaseModel):
+    direct_match: float = Field(default=0, ge=0, le=100)
+    transferable: float = Field(default=0, ge=0, le=100)
+    adjacent: float = Field(default=0, ge=0, le=100)
+    impact: float = Field(default=0, ge=0, le=100)
+    overall: float = Field(default=0, ge=0, le=100)
+    capability_scores: dict[str, float] = Field(default_factory=dict)
+
+
+class ExperienceMatrixRow(BaseModel):
+    category: FactCategory
+    name: str
+    source_fact_ids: list[str] = Field(default_factory=list)
+    relevance: MaterialRelevanceScore = Field(default_factory=MaterialRelevanceScore)
+    selected: bool = False
+
+
 class TailoredCopyUnit(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     content: str
@@ -75,6 +135,7 @@ class TailoredCopyUnit(BaseModel):
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
     matched_requirement_ids: list[str] = Field(default_factory=list)
     relevance_score: float = Field(default=0, ge=0, le=100)
+    relevance_breakdown: MaterialRelevanceScore = Field(default_factory=MaterialRelevanceScore)
     user_edited: bool = False
 
 
@@ -90,6 +151,7 @@ class TailoredExperienceEntry(BaseModel):
     organization: str | None = None
     period: str | None = None
     role: str | None = None
+    technologies: list[str] = Field(default_factory=list)
     tailored_summary: TailoredCopyUnit
     bullets: list[TailoredCopyUnit] = Field(default_factory=list)
     selected_reason: str = ""
@@ -130,7 +192,6 @@ class MatchAudit(BaseModel):
 
 class JDMatchCopy(BaseModel):
     personal_introduction: TailoredTextSection
-    professional_introduction: TailoredTextSection
     project_experiences: TailoredExperienceSection
     competition_experiences: TailoredExperienceSection
     internship_experiences: TailoredExperienceSection
@@ -141,12 +202,16 @@ class JDMatchResult(JDMatchCopy):
     match_id: str
     profile_task_id: str
     jd_analysis: JDAnalysis
+    job_research: JobResearch = Field(default_factory=JobResearch)
     requirement_matches: list[RequirementMatch] = Field(default_factory=list)
     overall_score: float = Field(default=0, ge=0, le=100)
     dimension_scores: dict[FactCategory, DimensionMatch] = Field(default_factory=dict)
     keyword_coverage: KeywordCoverage = Field(default_factory=KeywordCoverage)
     strengths: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
+    material_scores: dict[str, MaterialRelevanceScore] = Field(default_factory=dict)
+    experience_matrix: list[ExperienceMatrixRow] = Field(default_factory=list)
+    section_documents: dict[str, str] = Field(default_factory=dict)
     audit: MatchAudit = Field(default_factory=MatchAudit)
     model: str = ""
     version: int = Field(default=1, ge=1)
@@ -175,7 +240,6 @@ class CopyViolation(BaseModel):
 def iter_copy_units(result: JDMatchCopy | JDMatchResult):
     for section_name in (
         "personal_introduction",
-        "professional_introduction",
         "project_experiences",
         "competition_experiences",
         "internship_experiences",
