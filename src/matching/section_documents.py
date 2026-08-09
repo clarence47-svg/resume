@@ -1,8 +1,13 @@
 from pathlib import Path
-from profile.models import FactCategory, ProfileFact
+from profile.models import PROFILE_SECTION_CATEGORIES, FactCategory, ProfileFact
 from profile.section_documents import SECTION_FILENAMES, SECTION_TITLES
 
-from matching.models import JDAnalysis, JDMatchResult, TailoredTextSection
+from matching.models import (
+    JDAnalysis,
+    JDMatchResult,
+    MaterialRelevanceScore,
+    TailoredTextSection,
+)
 
 
 def render_selected_section_documents(
@@ -10,10 +15,12 @@ def render_selected_section_documents(
     selected_entries: dict[str, list[dict]],
     selected_fact_ids: dict[str, list[str]],
     analysis: JDAnalysis,
+    material_scores: dict[str, MaterialRelevanceScore] | None = None,
 ) -> dict[str, str]:
     fact_map = {fact.id: fact for fact in facts}
+    material_scores = material_scores or {}
     documents: dict[str, str] = {}
-    for category in FactCategory:
+    for category in PROFILE_SECTION_CATEGORIES:
         section_name = category.value
         lines = [
             f"# 画像母版_{SECTION_TITLES[section_name]}",
@@ -27,14 +34,26 @@ def render_selected_section_documents(
                 "可优先采用更有利且在素材中明确出现的数值。"
             ),
             "",
+            "## 岗位动态能力维度",
+            "",
         ]
-        if category in {FactCategory.PERSONAL, FactCategory.PROFESSIONAL}:
-            lines.extend(_fact_lines(selected_fact_ids.get(section_name, []), fact_map))
+        if analysis.capability_dimensions:
+            lines.extend(
+                f"- {item.name}：{item.description or '根据当前 JD 动态生成'}"
+                for item in analysis.capability_dimensions
+            )
+        else:
+            lines.append("- 当前 JD 未识别到可用的能力维度。")
+        lines.append("")
+        if category == FactCategory.PERSONAL:
+            lines.extend(
+                _fact_lines(selected_fact_ids.get(section_name, []), fact_map, material_scores)
+            )
         else:
             entries = selected_entries.get(section_name, [])
             if entries:
                 for selected in entries:
-                    lines.extend(_entry_lines(selected, fact_map))
+                    lines.extend(_entry_lines(selected, fact_map, material_scores))
             else:
                 lines.append("- 当前岗位未筛选到该维度的相关素材。")
         documents[section_name] = "\n".join(lines).strip() + "\n"
@@ -58,7 +77,7 @@ def render_result_section_documents(
 ) -> dict[str, str]:
     selected_entries: dict[str, list[dict]] = {}
     selected_fact_ids: dict[str, list[str]] = {}
-    for category in FactCategory:
+    for category in PROFILE_SECTION_CATEGORIES:
         section = getattr(result, category.value)
         if isinstance(section, TailoredTextSection):
             selected_fact_ids[category.value] = list(
@@ -91,10 +110,15 @@ def render_result_section_documents(
         selected_entries,
         selected_fact_ids,
         result.jd_analysis,
+        result.material_scores,
     )
 
 
-def _entry_lines(selected: dict, fact_map: dict[str, ProfileFact]) -> list[str]:
+def _entry_lines(
+    selected: dict,
+    fact_map: dict[str, ProfileFact],
+    material_scores: dict[str, MaterialRelevanceScore],
+) -> list[str]:
     entry = selected["entry"]
     name = entry.get("name") or entry.get("institution") or "经历"
     lines = [
@@ -115,12 +139,16 @@ def _entry_lines(selected: dict, fact_map: dict[str, ProfileFact]) -> list[str]:
     if technologies:
         lines.append(f"- 技术：{'、'.join(technologies)}")
     lines.extend(["", "### 可选素材", ""])
-    lines.extend(_fact_lines(selected.get("fact_ids", []), fact_map))
+    lines.extend(_fact_lines(selected.get("fact_ids", []), fact_map, material_scores))
     lines.append("")
     return lines
 
 
-def _fact_lines(fact_ids: list[str], fact_map: dict[str, ProfileFact]) -> list[str]:
+def _fact_lines(
+    fact_ids: list[str],
+    fact_map: dict[str, ProfileFact],
+    material_scores: dict[str, MaterialRelevanceScore],
+) -> list[str]:
     lines = []
     for fact_id in fact_ids:
         fact = fact_map.get(fact_id)
@@ -134,5 +162,15 @@ def _fact_lines(fact_ids: list[str], fact_map: dict[str, ProfileFact]) -> list[s
                 for item in fact.evidence_refs
             )
         )
-        lines.append(f"- [fact_id:{fact.id}] {fact.statement}（来源：{sources or '画像素材'}）")
+        score = material_scores.get(fact.id)
+        score_text = ""
+        if score:
+            score_text = (
+                f"；综合 {score.overall:.1f}，直接 {score.direct_match:.1f}，"
+                f"迁移 {score.transferable:.1f}，相邻 {score.adjacent:.1f}，"
+                f"影响 {score.impact:.1f}"
+            )
+        lines.append(
+            f"- [fact_id:{fact.id}] {fact.statement}（来源：{sources or '画像素材'}{score_text}）"
+        )
     return lines or ["- 当前岗位未筛选到该维度的相关素材。"]

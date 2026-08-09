@@ -14,6 +14,7 @@ from jobs.match_runner import MatchJobRunner
 from jobs.runner import JobAction, JobRunner
 from schema.profile_api import (
     DeleteResponse,
+    DocumentsAdded,
     DocumentStatus,
     DocumentSummary,
     FactsResponse,
@@ -147,6 +148,99 @@ def get_profile_task(
     )
 
 
+@router.post(
+    "/{task_id}/documents",
+    response_model=DocumentsAdded,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def add_profile_documents(
+    task_id: str,
+    files: list[UploadFile] = File(...),
+    repository: ProfileRepository = Depends(get_repository),
+    storage: FileStorage = Depends(get_storage),
+    runner: JobRunner = Depends(get_job_runner),
+) -> DocumentsAdded:
+    task = _require_task(repository, task_id)
+    if task.status in ACTIVE_STATUSES:
+        raise HTTPException(status_code=409, detail="任务正在处理中，请完成后再补充资料。")
+    if not files:
+        raise HTTPException(status_code=400, detail="至少上传一个文件。")
+    settings = storage.settings
+    existing = repository.get_documents(task_id)
+    stored_documents = [document for document in existing if document.stored_path]
+    if len(stored_documents) + len(files) > settings.max_files:
+        raise HTTPException(
+            status_code=400,
+            detail=f"画像池最多保存 {settings.max_files} 个有效文件。",
+        )
+    total_size = sum(document.size_bytes for document in stored_documents)
+    digests = {document.sha256 for document in stored_documents if document.sha256}
+    added_count = 0
+    skipped_count = 0
+    errors: list[str] = []
+    for upload in files:
+        original_name = upload.filename or "document"
+        extension = Path(original_name).suffix.lower()
+        try:
+            document_id, path, size_bytes, digest = await storage.save_upload(task_id, upload)
+            if digest in digests:
+                path.unlink(missing_ok=True)
+                skipped_count += 1
+                continue
+            total_size += size_bytes
+            if total_size > settings.max_total_size_mb * 1024 * 1024:
+                path.unlink(missing_ok=True)
+                raise FileValidationError(
+                    f"画像池总大小超过 {settings.max_total_size_mb} MB 限制。"
+                )
+            media_type = validate_file(path, original_name, settings)
+            repository.add_document(
+                document_id=document_id,
+                task_id=task_id,
+                original_name=original_name,
+                extension=extension,
+                size_bytes=size_bytes,
+                stored_path=str(path),
+                media_type=media_type or upload.content_type,
+                sha256=digest,
+            )
+            digests.add(digest)
+            added_count += 1
+        except Exception as exc:
+            errors.append(f"{original_name}: {exc}")
+            repository.add_document(
+                document_id=str(uuid4()),
+                task_id=task_id,
+                original_name=original_name,
+                extension=extension,
+                size_bytes=0,
+                stored_path=None,
+                media_type=upload.content_type,
+                sha256=None,
+                status=DocumentStatus.FAILED,
+                error=str(exc),
+            )
+    if added_count == 0:
+        detail = "上传文件均已存在于画像池。" if skipped_count else "; ".join(errors)
+        raise HTTPException(status_code=409 if skipped_count else 400, detail=detail)
+    repository.increment_attempt(task_id)
+    repository.update_task(
+        task_id,
+        status=TaskStatus.QUEUED.value,
+        stage="queued",
+        progress=0,
+        error="; ".join(errors) if errors else None,
+    )
+    await runner.enqueue(task_id, JobAction.FULL)
+    return DocumentsAdded(
+        task_id=task_id,
+        status=TaskStatus.QUEUED,
+        added_count=added_count,
+        skipped_count=skipped_count,
+        errors=errors,
+    )
+
+
 @router.get("/{task_id}/facts", response_model=FactsResponse)
 def get_facts(
     task_id: str, repository: ProfileRepository = Depends(get_repository)
@@ -246,6 +340,8 @@ def export_profile_section(
         category = FactCategory(section_name)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="画像维度不存在。") from exc
+    if category.value not in SECTION_FILENAMES:
+        raise HTTPException(status_code=404, detail="画像维度不存在。")
     result = repository.get_result(task_id)
     if result is None:
         raise HTTPException(status_code=409, detail="画像尚未生成。")

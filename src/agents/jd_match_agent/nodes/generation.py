@@ -1,5 +1,11 @@
 import json
-from profile.models import EvidenceRef, FactCategory, ProfileFact, SectionStatus
+from profile.models import (
+    PROFILE_SECTION_CATEGORIES,
+    EvidenceRef,
+    FactCategory,
+    ProfileFact,
+    SectionStatus,
+)
 from profile.section_documents import extract_document_fact_ids
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -10,6 +16,7 @@ from core.model import get_match_model
 from core.settings import get_settings
 from matching.models import (
     JDAnalysis,
+    MaterialRelevanceScore,
     RequirementMatch,
     TailoredCopyUnit,
     TailoredEducationEntry,
@@ -19,7 +26,7 @@ from matching.models import (
     TailoredTextSection,
 )
 
-SECTION_NAMES = [category.value for category in FactCategory]
+SECTION_NAMES = [category.value for category in PROFILE_SECTION_CATEGORIES]
 
 
 async def generate_section(state: dict) -> dict:
@@ -79,7 +86,7 @@ async def generate_section(state: dict) -> dict:
 
 def _heuristic_draft(section_name: str, context: dict, facts: list[ProfileFact]):
     fact_map = {fact.id: fact for fact in facts}
-    if section_name in {FactCategory.PERSONAL.value, FactCategory.PROFESSIONAL.value}:
+    if section_name == FactCategory.PERSONAL.value:
         selected = [
             fact_map[fact_id] for fact_id in context["selected_fact_ids"] if fact_id in fact_map
         ]
@@ -145,9 +152,15 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
         ]
     }
     relevance = state.get("fact_relevance", {})
-    if section_name in {FactCategory.PERSONAL.value, FactCategory.PROFESSIONAL.value}:
-        overview = _unit(draft.overview, fact_map, match_map, relevance)
-        bullets = [_unit(item, fact_map, match_map, relevance) for item in draft.bullets]
+    material_scores = {
+        fact_id: MaterialRelevanceScore.model_validate(value)
+        for fact_id, value in state.get("material_scores", {}).items()
+    }
+    if section_name == FactCategory.PERSONAL.value:
+        overview = _unit(draft.overview, fact_map, match_map, relevance, material_scores)
+        bullets = [
+            _unit(item, fact_map, match_map, relevance, material_scores) for item in draft.bullets
+        ]
         status = (
             SectionStatus.COMPLETE
             if overview.source_fact_ids
@@ -173,9 +186,12 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
                     degree=raw.get("degree"),
                     major=raw.get("major"),
                     period=raw.get("period"),
-                    tailored_summary=_unit(item.summary, fact_map, match_map, relevance),
+                    tailored_summary=_unit(
+                        item.summary, fact_map, match_map, relevance, material_scores
+                    ),
                     bullets=[
-                        _unit(value, fact_map, match_map, relevance) for value in item.bullets
+                        _unit(value, fact_map, match_map, relevance, material_scores)
+                        for value in item.bullets
                     ],
                     relevance_score=source["relevance_score"],
                     evidence_refs=_fact_evidence(source["fact_ids"], fact_map),
@@ -183,7 +199,7 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
             )
         return TailoredEducationSection(
             status=SectionStatus.COMPLETE if entries else SectionStatus.INSUFFICIENT_EVIDENCE,
-            overview=_unit(draft.overview, fact_map, match_map, relevance),
+            overview=_unit(draft.overview, fact_map, match_map, relevance, material_scores),
             entries=entries,
         )
     entries = []
@@ -192,7 +208,7 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
         if source is None:
             continue
         raw = source["entry"]
-        summary = _unit(item.summary, fact_map, match_map, relevance)
+        summary = _unit(item.summary, fact_map, match_map, relevance, material_scores)
         _preserve_core_summary(summary, raw.get("summary"))
         entries.append(
             TailoredExperienceEntry(
@@ -202,7 +218,10 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
                 role=raw.get("role"),
                 technologies=raw.get("technologies", []),
                 tailored_summary=summary,
-                bullets=[_unit(value, fact_map, match_map, relevance) for value in item.bullets],
+                bullets=[
+                    _unit(value, fact_map, match_map, relevance, material_scores)
+                    for value in item.bullets
+                ],
                 selected_reason=item.selected_reason,
                 relevance_score=source["relevance_score"],
                 evidence_refs=_fact_evidence(source["fact_ids"], fact_map),
@@ -210,12 +229,12 @@ def _materialize(section_name: str, draft: TailoredSectionDraft, state: dict, fa
         )
     return TailoredExperienceSection(
         status=SectionStatus.COMPLETE if entries else SectionStatus.INSUFFICIENT_EVIDENCE,
-        overview=_unit(draft.overview, fact_map, match_map, relevance),
+        overview=_unit(draft.overview, fact_map, match_map, relevance, material_scores),
         entries=entries,
     )
 
 
-def _unit(draft, fact_map, match_map, relevance) -> TailoredCopyUnit:
+def _unit(draft, fact_map, match_map, relevance, material_scores) -> TailoredCopyUnit:
     fact_ids = [fact_id for fact_id in draft.source_fact_ids if fact_id in fact_map]
     matched_requirement_ids = list(
         dict.fromkeys(
@@ -238,6 +257,29 @@ def _unit(draft, fact_map, match_map, relevance) -> TailoredCopyUnit:
         evidence_refs=_fact_evidence(fact_ids, fact_map),
         matched_requirement_ids=matched_requirement_ids,
         relevance_score=score,
+        relevance_breakdown=_aggregate_relevance(fact_ids, material_scores),
+    )
+
+
+def _aggregate_relevance(
+    fact_ids: list[str], material_scores: dict[str, MaterialRelevanceScore]
+) -> MaterialRelevanceScore:
+    scores = [material_scores[fact_id] for fact_id in fact_ids if fact_id in material_scores]
+    if not scores:
+        return MaterialRelevanceScore()
+    capability_ids = {
+        capability_id for score in scores for capability_id in score.capability_scores
+    }
+    return MaterialRelevanceScore(
+        direct_match=max(item.direct_match for item in scores),
+        transferable=max(item.transferable for item in scores),
+        adjacent=max(item.adjacent for item in scores),
+        impact=max(item.impact for item in scores),
+        overall=max(item.overall for item in scores),
+        capability_scores={
+            capability_id: max(item.capability_scores.get(capability_id, 0) for item in scores)
+            for capability_id in capability_ids
+        },
     )
 
 

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     job_search_fallback_endpoint: str = "https://www.bing.com/search"
     job_search_max_results: int = Field(default=8, ge=1, le=20)
     job_search_timeout_seconds: float = Field(default=12, ge=1, le=60)
+    competition_verification_enabled: bool = True
+    competition_verification_min_score: float = Field(default=0.58, ge=0, le=1)
+    competition_verification_max_results: int = Field(default=6, ge=1, le=20)
     ocr_enabled: bool = True
     allow_heuristic_fallback: bool = True
     app_encryption_key: str = ""

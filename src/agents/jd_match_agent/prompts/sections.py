@@ -22,7 +22,6 @@ SECTION_SYSTEM_PROMPT = """
 
 SECTION_GUIDANCE = {
     "personal_introduction": "生成 120-180 字概述和最多 3 条核心优势。",
-    "professional_introduction": "生成 120-200 字概述、专业能力条目和 6-12 个支持充分的关键词。",
     "project_experiences": "仅改写已选择的最多 3 个项目，每项 2-4 条简历条目。",
     "competition_experiences": "仅改写已选择的最多 2 个比赛，每项 2-3 条简历条目。",
     "internship_experiences": "仅改写已选择的最多 2 段实习，每项 2-4 条简历条目。",

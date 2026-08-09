@@ -10,27 +10,13 @@ def export_docx(result: ProfileResult, path: Path) -> Path:
     normal = document.styles["Normal"]
     normal.font.name = "Noto Sans CJK SC"
     normal.font.size = Pt(10.5)
-    document.add_heading("用户六维画像", level=0)
+    document.add_heading("用户五维画像", level=0)
     document.add_paragraph(f"生成时间：{result.generated_at.isoformat()}")
 
-    document.add_heading("个人介绍", level=1)
+    document.add_heading("个人信息", level=1)
     document.add_paragraph(result.personal_introduction.overview)
-    _add_claims(
-        document,
-        result.personal_introduction.core_strengths
-        + result.personal_introduction.work_characteristics
-        + result.personal_introduction.career_direction,
-    )
-
-    document.add_heading("专业介绍", level=1)
-    document.add_paragraph(result.professional_introduction.overview)
-    _add_claims(
-        document,
-        result.professional_introduction.knowledge_domains
-        + result.professional_introduction.skills
-        + result.professional_introduction.research_interests
-        + result.professional_introduction.certifications,
-    )
+    for item in result.personal_introduction.items:
+        document.add_paragraph(f"{item.label}：{item.value}", style="List Bullet")
 
     _add_experience(document, "项目经历", result.project_experiences)
     _add_experience(document, "比赛经历", result.competition_experiences)
@@ -44,6 +30,11 @@ def export_docx(result: ProfileResult, path: Path) -> Path:
         document.add_paragraph(f"学历：{entry.degree or '资料未提供'}")
         document.add_paragraph(f"专业：{entry.major or '资料未提供'}")
         document.add_paragraph(f"时间：{entry.period or '资料未提供'}")
+        document.add_paragraph(f"平均成绩：{entry.average_score or '资料未提供'}")
+        document.add_paragraph(f"排名：{entry.ranking or '资料未提供'}")
+        document.add_paragraph(f"综合评价：{entry.evaluation or '资料未提供'}")
+        document.add_paragraph(f"语言成绩：{'、'.join(entry.language_scores) or '资料未提供'}")
+        document.add_paragraph(f"核心课程：{'、'.join(entry.courses) or '资料未提供'}")
         _add_claims(document, entry.honors + entry.campus_experiences)
 
     document.add_heading("质量审计", level=1)

@@ -1,13 +1,15 @@
 import json
 from collections import defaultdict
+from profile.competition_verification import competition_fact_is_verified
 from profile.models import (
+    PROFILE_SECTION_CATEGORIES,
     EducationEntry,
     EducationHistory,
     ExperienceEntry,
     ExperienceSection,
     FactCategory,
+    PersonalInformationItem,
     PersonalIntroduction,
-    ProfessionalIntroduction,
     ProfileClaim,
     ProfileFact,
     SectionStatus,
@@ -15,18 +17,37 @@ from profile.models import (
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from agents.profile_agent.nodes.extraction import _detect_personal_field
 from agents.profile_agent.prompts.sections import SECTION_SYSTEM_PROMPT, section_user_prompt
 from agents.profile_agent.schemas import ClaimDraft, EntryDraft, SectionDraft
 from core.model import get_profile_model
 from core.settings import get_settings
 
-SECTION_NAMES = [category.value for category in FactCategory]
+SECTION_NAMES = [category.value for category in PROFILE_SECTION_CATEGORIES]
+
+PERSONAL_LABELS = {
+    "name": "姓名",
+    "birth_date": "出生年月",
+    "hometown": "籍贯",
+    "school": "当前学校",
+    "phone": "电话",
+    "email": "邮箱",
+    "target_role": "求职方向",
+    "portfolio": "作品集",
+    "location": "所在城市",
+}
 
 
 async def generate_section(state: dict) -> dict:
     section_name = state["section_name"]
     all_facts = [ProfileFact.model_validate(item) for item in state.get("facts", [])]
     facts = _relevant_facts(section_name, all_facts)
+    if section_name == FactCategory.PERSONAL.value:
+        section = _personal_information(facts)
+        return {
+            "section_outputs": [{"section": section_name, "data": section.model_dump(mode="json")}],
+            "warnings": [],
+        }
     settings = get_settings()
     warnings: list[str] = []
     if settings.llm_configured:
@@ -61,36 +82,20 @@ async def generate_section(state: dict) -> dict:
 
 
 def _relevant_facts(section_name: str, facts: list[ProfileFact]) -> list[ProfileFact]:
-    if section_name == FactCategory.PERSONAL.value:
-        return [fact for fact in facts if fact.status.value != "rejected"]
-    return [
+    selected = [
         fact
         for fact in facts
         if fact.category.value == section_name and fact.status.value != "rejected"
     ]
+    if section_name == FactCategory.COMPETITION.value:
+        return [fact for fact in selected if competition_fact_is_verified(fact)]
+    return selected
 
 
 def _heuristic_section(section_name: str, facts: list[ProfileFact]) -> SectionDraft:
     if not facts:
         return SectionDraft(overview="资料未提供足够信息。")
     overview = "；".join(fact.statement for fact in facts[:4])[:1000]
-    if section_name in {
-        FactCategory.PERSONAL.value,
-        FactCategory.PROFESSIONAL.value,
-    }:
-        default_group = "core_strength" if section_name == FactCategory.PERSONAL.value else "skill"
-        claims = [
-            ClaimDraft(
-                group=default_group,
-                content=fact.statement,
-                basis_type=fact.basis_type,
-                confidence=fact.confidence,
-                fact_ids=[fact.id],
-                rationale=fact.rationale,
-            )
-            for fact in facts[:12]
-        ]
-        return SectionDraft(overview=overview, claims=claims)
     grouped: defaultdict[str, list[ProfileFact]] = defaultdict(list)
     for fact in facts:
         grouped[fact.material_group_id or fact.id].append(fact)
@@ -119,7 +124,20 @@ def _heuristic_section(section_name: str, facts: list[ProfileFact]) -> SectionDr
                     )
                     for fact in group_facts
                 ],
-                attributes={"material_group_id": group_facts[0].material_group_id or ""},
+                attributes={
+                    key: value
+                    for key, value in {
+                        "material_group_id": group_facts[0].material_group_id or "",
+                        "degree": _first_metadata(group_facts, "degree"),
+                        "major": _first_metadata(group_facts, "major"),
+                        "courses": _first_metadata(group_facts, "courses"),
+                        "average_score": _first_metadata(group_facts, "average_score"),
+                        "ranking": _first_metadata(group_facts, "ranking"),
+                        "evaluation": _first_metadata(group_facts, "evaluation"),
+                        "language_scores": _first_metadata(group_facts, "language_scores"),
+                    }.items()
+                    if value
+                },
                 fact_ids=fact_ids,
             )
         )
@@ -128,27 +146,6 @@ def _heuristic_section(section_name: str, facts: list[ProfileFact]) -> SectionDr
 
 def _materialize_section(section_name: str, draft: SectionDraft, facts: list[ProfileFact]):
     fact_map = {fact.id: fact for fact in facts}
-    if section_name == FactCategory.PERSONAL.value:
-        grouped = _group_claims(draft.claims, fact_map)
-        return PersonalIntroduction(
-            status=SectionStatus.COMPLETE if facts else SectionStatus.INSUFFICIENT_EVIDENCE,
-            overview=draft.overview,
-            core_strengths=grouped["core_strength"],
-            work_characteristics=grouped["work_characteristic"],
-            career_direction=grouped["career_direction"],
-            keywords=draft.keywords,
-        )
-    if section_name == FactCategory.PROFESSIONAL.value:
-        grouped = _group_claims(draft.claims, fact_map)
-        return ProfessionalIntroduction(
-            status=SectionStatus.COMPLETE if facts else SectionStatus.INSUFFICIENT_EVIDENCE,
-            overview=draft.overview,
-            knowledge_domains=grouped["knowledge_domain"],
-            skills=grouped["skill"],
-            tools_and_technologies=draft.keywords,
-            research_interests=grouped["research_interest"],
-            certifications=grouped["certification"],
-        )
     if section_name == FactCategory.EDUCATION.value:
         entries = []
         seen_groups: set[str] = set()
@@ -170,6 +167,10 @@ def _materialize_section(section_name: str, draft: SectionDraft, facts: list[Pro
                     major=entry.attributes.get("major"),
                     period=entry.period,
                     overview=entry.summary,
+                    average_score=entry.attributes.get("average_score"),
+                    ranking=entry.attributes.get("ranking"),
+                    evaluation=entry.attributes.get("evaluation"),
+                    language_scores=_split_attribute(entry.attributes.get("language_scores")),
                     courses=_split_attribute(entry.attributes.get("courses")),
                     honors=grouped["honor"] + grouped["outcome"],
                     campus_experiences=grouped["detail"],
@@ -207,6 +208,25 @@ def _materialize_section(section_name: str, draft: SectionDraft, facts: list[Pro
         attributes = dict(entry.attributes)
         if len(group_ids) == 1:
             attributes["material_group_id"] = next(iter(group_ids))
+        if section_name == FactCategory.COMPETITION.value:
+            verification = next(
+                (
+                    fact_map[fact_id].metadata.get("competition_verification")
+                    for fact_id in entry_fact_ids
+                    if fact_id in fact_map
+                    and fact_map[fact_id].metadata.get("competition_verification")
+                ),
+                None,
+            )
+            if isinstance(verification, dict):
+                attributes["verification_status"] = str(verification.get("status") or "")
+                attributes["verification_matched_name"] = str(
+                    verification.get("matched_name") or ""
+                )
+                attributes["verification_score"] = str(verification.get("score") or "")
+                attributes["verification_sources"] = json.dumps(
+                    verification.get("sources") or [], ensure_ascii=False
+                )
         entries.append(
             ExperienceEntry(
                 name=entry.name,
@@ -228,6 +248,57 @@ def _materialize_section(section_name: str, draft: SectionDraft, facts: list[Pro
         overview=draft.overview,
         entries=entries,
     )
+
+
+def _personal_information(facts: list[ProfileFact]) -> PersonalIntroduction:
+    selected: dict[tuple[str, str], PersonalInformationItem] = {}
+    for fact in facts:
+        field = str(fact.metadata.get("personal_field") or "").strip()
+        value = str(fact.metadata.get("personal_value") or "").strip()
+        detected = _detect_personal_field(fact.statement)
+        if not field and detected:
+            field, value = detected
+        elif field and not value:
+            value = (
+                detected[1]
+                if detected and detected[0] == field
+                else _personal_value(fact.statement)
+            )
+        if field not in PERSONAL_LABELS or not value:
+            continue
+        key = (field, value.casefold())
+        item = PersonalInformationItem(
+            key=field,
+            label=PERSONAL_LABELS[field],
+            value=value,
+            confidence=fact.confidence,
+            evidence_refs=fact.evidence_refs,
+            source_fact_ids=[fact.id],
+        )
+        existing = selected.get(key)
+        if existing is None or item.confidence > existing.confidence:
+            selected[key] = item
+    items = sorted(
+        selected.values(),
+        key=lambda item: list(PERSONAL_LABELS).index(item.key),
+    )
+    overview = (
+        "；".join(f"{item.label}：{item.value}" for item in items)
+        if items
+        else "未从资料中识别到姓名、联系方式、求职方向等个人基本信息。"
+    )
+    return PersonalIntroduction(
+        status=SectionStatus.COMPLETE if items else SectionStatus.INSUFFICIENT_EVIDENCE,
+        overview=overview,
+        items=items,
+    )
+
+
+def _personal_value(statement: str) -> str:
+    for separator in ("：", ":"):
+        if separator in statement:
+            return statement.split(separator, 1)[1].strip()
+    return statement.strip()
 
 
 def _group_claims(

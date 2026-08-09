@@ -11,7 +11,6 @@ from fastapi.responses import FileResponse, Response
 from agents.jd_match_agent.nodes.audit import audit_result
 from jobs.match_runner import MatchJobAction, MatchJobRunner
 from matching.exporters import export_match_docx, export_match_markdown
-from matching.materials import match_result_materials
 from matching.models import JDMatchResult, MatchVersionSource
 from matching.section_documents import render_result_section_documents
 from matching.validation import apply_draft_updates, validate_jd_text
@@ -71,10 +70,6 @@ async def create_match(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     match_id = str(uuid4())
     facts = profile_repository.get_facts(payload.profile_task_id)
-    for previous_task in repository.list_tasks(payload.profile_task_id):
-        if previous_task.result and previous_task.result.result_json:
-            previous_result = JDMatchResult.model_validate(previous_task.result.result_json)
-            facts.extend(match_result_materials(previous_result, facts))
     section_paths = write_profile_section_documents(
         profile_result,
         facts,

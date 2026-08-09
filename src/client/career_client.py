@@ -67,6 +67,9 @@ class CareerClient:
             "GET", f"/resumes/{resume_id}/export", params={"format": format}
         ).content
 
+    def download_resume_document(self, resume_id: str, document_key: str) -> bytes:
+        return self._request("GET", f"/resumes/{resume_id}/documents/{document_key}").content
+
     def create_application(self, job_id: str, resume_version_id: str) -> dict:
         return self._request(
             "POST",

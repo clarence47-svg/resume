@@ -1,18 +1,18 @@
 # 一体化智能投简历 Agent
 
-基于 `LangGraph + FastAPI + Streamlit + Pydantic` 的本地单用户求职工作台。项目保留原有六维画像和 JD 匹配能力，并扩展岗位池、批量定制、ATS 简历、安全浏览器投递、进度跟踪与面试准备。
+基于 `LangGraph + FastAPI + Streamlit + Pydantic` 的本地单用户求职工作台。项目提供五维画像和 JD 匹配能力，并扩展岗位池、批量定制、ATS 简历、安全浏览器投递、进度跟踪与面试准备。
 
 ## 完整流程
 
 ```text
-资料上传 → 六维画像 → 求职规则 → 岗位发现 → 硬筛选与评分
+资料上传 → 五维画像 → 求职规则 → 岗位发现 → 硬筛选与评分
 → 批量 JD 匹配 → 定制简历 → 投递预览 → 用户确认
 → 提交验证 → 跟进看板 → 面试准备
 ```
 
 ## 六个工作区
 
-1. **我的资料**：上传 DOC、DOCX、PDF、Markdown、PPT、PPTX，审核事实并生成六维画像。
+1. **我的资料**：上传 DOC、DOCX、PDF、Markdown、PPT、PPTX，生成可持续补充的五维画像。
 2. **求职设置**：管理联系方式、目标岗位、城市、薪资、排除规则和申请答案库。
 3. **岗位池**：手动导入、官方页面发现、BOSS 浏览器采集、去重、硬筛选和评分。
 4. **简历工作室**：单岗位或批量 JD 匹配，生成 ATS 简历及申请材料。
@@ -21,10 +21,13 @@
 
 ## 核心能力
 
-- 六维画像：个人介绍、专业介绍、项目经历、比赛经历、实习经历、学校履历。
+- 五维画像：个人信息、项目经历、比赛经历、实习经历、学校履历。
+- 个人信息边界：只提取姓名、出生年月、籍贯、学校、电话、邮箱、求职方向、作品集和所在城市。
+- 比赛真实性：赛事名称通过百度/必应模糊检索核验，缺少可靠来源时不进入最终比赛画像。
 - 证据约束：事实和推断保留文件、页码/幻灯片/段落、原文引用与置信度。
-- 经历素材聚合：同一经历的岗位化标题和不同职责表达作为互补素材，不误判为冲突。
-- JD 匹配：总体分、六维分、关键词覆盖、优势、缺口和最相关经历选择。
+- 经历素材聚合：只在“我的资料”生成五维完整素材池；同一经历的岗位化标题和不同职责表达作为互补素材，不误判为冲突。
+- JD 匹配：每个岗位从画像快照动态生成能力维度，按直接匹配、可迁移能力、相邻经验和成果影响评分，不把历史岗位文案反写进画像。
+- 简历版本：每个岗位保存五份岗位画像母版和一份最终简历 Markdown，同时提供 HTML、DOCX、PDF 导出。
 - 批量定制：一次处理 1–20 个岗位，重复能力缺口只保留一个问题。
 - 岗位规则：排除公司、岗位、外包、实习、地点、薪资和发布时间。
 - 简历导出：JSON、Markdown、HTML、DOCX、PDF。
@@ -137,6 +140,7 @@ sh scripts/smoke_test.sh
 ### 画像与 JD 匹配
 
 - `POST/GET /profiles`
+- `POST /profiles/{task_id}/documents`
 - `GET/PUT /profiles/{task_id}/facts`
 - `POST /profiles/{task_id}/resume|regenerate|retry`
 - `GET /profiles/{task_id}/result|export`
@@ -162,6 +166,7 @@ sh scripts/smoke_test.sh
 
 - `POST /jobs/{id}/resume`
 - `GET /resumes/{id}/export?format=json|md|html|docx|pdf`
+- `GET /resumes/{id}/documents/{personal_introduction|project_experiences|competition_experiences|internship_experiences|education_history|final_resume}`
 - `POST /applications`
 - `GET /applications/{id}/preview`
 - `POST /applications/{id}/confirm|resume|cancel`
@@ -174,7 +179,7 @@ sh scripts/smoke_test.sh
 ```text
 data/
 ├── uploads/                 # 原始资料
-├── parsed/                  # 标准化文档与六维素材
+├── parsed/                  # 标准化文档与五维素材
 ├── jobs/                    # 岗位采集数据
 ├── resumes/                 # 简历版本数据
 ├── applications/            # 提交确认截图与证据

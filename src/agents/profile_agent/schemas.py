@@ -16,6 +16,7 @@ class ExtractedFactDraft(BaseModel):
     organization: str | None = None
     period: str | None = None
     role: str | None = None
+    personal_field: str | None = None
 
 
 class FactExtractionResponse(BaseModel):

@@ -12,6 +12,12 @@ class JDRequirementDraft(BaseModel):
     keywords: list[str] = Field(default_factory=list)
 
 
+class CapabilityDimensionDraft(BaseModel):
+    name: str
+    description: str = ""
+    keywords: list[str] = Field(default_factory=list)
+
+
 class JDAnalysisDraft(BaseModel):
     role_title: str = "目标岗位"
     seniority: str | None = None
@@ -22,6 +28,7 @@ class JDAnalysisDraft(BaseModel):
     education_requirements: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     requirements: list[JDRequirementDraft] = Field(default_factory=list)
+    capability_dimensions: list[CapabilityDimensionDraft] = Field(default_factory=list)
 
 
 class JobResearchDraft(BaseModel):

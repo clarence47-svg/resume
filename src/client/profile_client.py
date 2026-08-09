@@ -37,6 +37,16 @@ class ProfileClient:
     def list_profiles(self) -> list[dict]:
         return self._request("GET", "/profiles").json()
 
+    def add_documents(self, task_id: str, files) -> dict:
+        payload = []
+        for file in files:
+            payload.append(("files", (file.name, file.getvalue(), file.type)))
+        return self._request(
+            "POST",
+            f"/profiles/{task_id}/documents",
+            files=payload,
+        ).json()
+
     def get_task(self, task_id: str) -> dict:
         return self._request("GET", f"/profiles/{task_id}").json()
 

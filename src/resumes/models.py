@@ -56,7 +56,6 @@ class ResumeDocument(BaseModel):
     target_title: str = ""
     contact_line: str = ""
     summary: str = ""
-    professional_overview: str = ""
     skills: list[str] = Field(default_factory=list)
     projects: list[ResumeExperience] = Field(default_factory=list)
     competitions: list[ResumeExperience] = Field(default_factory=list)

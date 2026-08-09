@@ -63,3 +63,59 @@ def test_profile_creation_always_uses_auto_mode(test_settings) -> None:
         task = client.get(f"/profiles/{task_id}").json()
         assert task["review_mode"] == "auto"
         client.delete(f"/profiles/{task_id}")
+
+
+def test_completed_profile_accepts_supplemental_documents(test_settings) -> None:
+    app = create_app(test_settings)
+    with TestClient(app) as client:
+        created = client.post(
+            "/profiles",
+            files={
+                "files": (
+                    "resume.md",
+                    "# 项目经历\n校园平台项目：负责 FastAPI 后端开发。",
+                    "text/markdown",
+                )
+            },
+            data={"title": "可补充画像"},
+        )
+        task_id = created.json()["task_id"]
+        task = {}
+        for _ in range(100):
+            task = client.get(f"/profiles/{task_id}").json()
+            if task["status"] in {"completed", "partial_success", "failed_retryable"}:
+                break
+            time.sleep(0.05)
+        assert task["status"] in {"completed", "partial_success"}, task
+
+        supplemented = client.post(
+            f"/profiles/{task_id}/documents",
+            files={
+                "files": (
+                    "internship.md",
+                    "# 实习经历\n示例公司：负责数据接口开发与测试。",
+                    "text/markdown",
+                )
+            },
+        )
+        assert supplemented.status_code == 202, supplemented.text
+        assert supplemented.json()["added_count"] == 1
+        for _ in range(100):
+            task = client.get(f"/profiles/{task_id}").json()
+            if task["status"] in {"completed", "partial_success", "failed_retryable"}:
+                break
+            time.sleep(0.05)
+        assert task["status"] in {"completed", "partial_success"}, task
+        assert len(task["documents"]) == 2
+
+        duplicate = client.post(
+            f"/profiles/{task_id}/documents",
+            files={
+                "files": (
+                    "internship.md",
+                    "# 实习经历\n示例公司：负责数据接口开发与测试。",
+                    "text/markdown",
+                )
+            },
+        )
+        assert duplicate.status_code == 409

@@ -31,7 +31,6 @@ def test_match_exporters_create_files(tmp_path: Path) -> None:
             ],
         ),
         personal_introduction=TailoredTextSection(overview=empty),
-        professional_introduction=TailoredTextSection(overview=empty),
         project_experiences=TailoredExperienceSection(overview=empty),
         competition_experiences=TailoredExperienceSection(overview=empty),
         internship_experiences=TailoredExperienceSection(overview=empty),

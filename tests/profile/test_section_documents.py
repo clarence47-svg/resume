@@ -7,7 +7,7 @@ from profile.section_documents import (
 )
 
 
-def test_writes_six_profile_section_documents(tmp_path) -> None:
+def test_writes_five_profile_section_documents(tmp_path) -> None:
     evidence = EvidenceRef(
         span_id="span-project",
         document_id="doc",

@@ -18,12 +18,12 @@ class AgentDefinition:
 
 agents = {
     "profile-agent": AgentDefinition(
-        description="从用户上传资料生成可追溯的六维详细画像。",
+        description="从用户上传资料生成可追溯的五维详细画像。",
         graph_factory=build_graph,
         protocol="profile",
     ),
     "jd-match-agent": AgentDefinition(
-        description="根据六维用户画像和岗位 JD 生成证据约束的匹配分析与简历文案。",
+        description="根据五维用户画像和岗位 JD 生成证据约束的匹配分析与简历文案。",
         graph_factory=build_jd_match_graph,
         protocol="jd-match",
     ),

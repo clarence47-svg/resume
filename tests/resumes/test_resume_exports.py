@@ -13,6 +13,10 @@ from resumes.exporters.html import export_html
 from resumes.exporters.markdown import export_markdown
 from resumes.exporters.pdf import export_pdf
 from resumes.models import ResumeTemplate
+from resumes.source_documents import (
+    RESUME_DOCUMENT_FILENAMES,
+    write_resume_source_documents,
+)
 
 
 def test_resume_materials_and_all_exports(tmp_path: Path):
@@ -30,11 +34,7 @@ def test_resume_materials_and_all_exports(tmp_path: Path):
             status=SectionStatus.COMPLETE,
             overview=unit,
         ),
-        professional_introduction=TailoredTextSection(
-            status=SectionStatus.COMPLETE,
-            overview=unit,
-            keywords=["Python", "FastAPI"],
-        ),
+        keyword_coverage={"matched": ["Python", "FastAPI"], "ratio": 1},
         project_experiences=empty_experience,
         competition_experiences=empty_experience,
         internship_experiences=empty_experience,
@@ -56,7 +56,8 @@ def test_resume_materials_and_all_exports(tmp_path: Path):
     document.audit = audit_resume(document, job.jd_text)
     assert "示例公司" in document.application_materials.cover_letter
     assert "Python 开发" in document.application_materials.boss_greeting
-    markdown_path = export_markdown(document, tmp_path / "resume.md")
+    source_paths = write_resume_source_documents(result, [], tmp_path)
+    markdown_path = export_markdown(document, tmp_path / RESUME_DOCUMENT_FILENAMES["final_resume"])
     html_path = export_html(document, tmp_path / "resume.html")
     docx_path = export_docx(document, tmp_path / "resume.docx")
     pdf_path = export_pdf(docx_path, tmp_path / "resume.pdf", html_path)
@@ -64,5 +65,7 @@ def test_resume_materials_and_all_exports(tmp_path: Path):
     assert html_path.exists()
     assert docx_path.exists()
     assert pdf_path and pdf_path.exists()
+    assert len(source_paths) == 5
+    assert len(list(tmp_path.glob("*.md"))) == 6
     with fitz.open(pdf_path) as pdf:
         assert pdf.page_count >= 1

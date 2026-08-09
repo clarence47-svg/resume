@@ -7,15 +7,13 @@ from profile.models import (
     FactCategory,
     FactStatus,
     PersonalIntroduction,
-    ProfessionalIntroduction,
     ProfileClaim,
     ProfileFact,
     ProfileResult,
 )
 
 SECTION_TITLES = {
-    FactCategory.PERSONAL.value: "个人介绍",
-    FactCategory.PROFESSIONAL.value: "专业介绍",
+    FactCategory.PERSONAL.value: "个人信息",
     FactCategory.PROJECT.value: "项目经历",
     FactCategory.COMPETITION.value: "比赛经历",
     FactCategory.INTERNSHIP.value: "实习经历",
@@ -32,7 +30,6 @@ def render_profile_section_documents(
 ) -> dict[str, str]:
     sections = {
         FactCategory.PERSONAL.value: _personal(result.personal_introduction),
-        FactCategory.PROFESSIONAL.value: _professional(result.professional_introduction),
         FactCategory.PROJECT.value: _experience(result.project_experiences),
         FactCategory.COMPETITION.value: _experience(result.competition_experiences),
         FactCategory.INTERNSHIP.value: _experience(result.internship_experiences),
@@ -95,22 +92,13 @@ def extract_document_fact_ids(content: str) -> set[str]:
 
 def _personal(section: PersonalIntroduction) -> list[str]:
     lines = [f"状态：{section.status.value}", "", section.overview, ""]
-    lines.extend(_claims("核心优势", section.core_strengths))
-    lines.extend(_claims("工作特点", section.work_characteristics))
-    lines.extend(_claims("职业方向", section.career_direction))
-    if section.keywords:
-        lines.extend(["## 关键词", "", "、".join(section.keywords), ""])
-    return lines
-
-
-def _professional(section: ProfessionalIntroduction) -> list[str]:
-    lines = [f"状态：{section.status.value}", "", section.overview, ""]
-    lines.extend(_claims("知识结构", section.knowledge_domains))
-    lines.extend(_claims("专业技能", section.skills))
-    lines.extend(_claims("研究兴趣", section.research_interests))
-    lines.extend(_claims("证书", section.certifications))
-    if section.tools_and_technologies:
-        lines.extend(["## 工具与技术", "", "、".join(section.tools_and_technologies), ""])
+    for item in section.items:
+        lines.append(
+            f"- {item.label}：{item.value}（置信度 {item.confidence:.0%}；"
+            f"证据：{_evidence(item.evidence_refs)}；事实：{'、'.join(item.source_fact_ids)}）"
+        )
+    if section.items:
+        lines.append("")
     return lines
 
 
@@ -148,6 +136,10 @@ def _education(section: EducationHistory) -> list[str]:
                 f"- 学历：{entry.degree or '资料未提供'}",
                 f"- 专业：{entry.major or '资料未提供'}",
                 f"- 时间：{entry.period or '资料未提供'}",
+                f"- 平均成绩：{entry.average_score or '资料未提供'}",
+                f"- 排名：{entry.ranking or '资料未提供'}",
+                f"- 综合评价：{entry.evaluation or '资料未提供'}",
+                f"- 语言成绩：{'、'.join(entry.language_scores) or '资料未提供'}",
                 f"- 课程：{'、'.join(entry.courses) or '资料未提供'}",
                 f"- 证据：{_evidence(entry.evidence_refs)}",
                 f"- 素材事实：{'、'.join(entry.source_fact_ids) or '资料未提供'}",
@@ -189,16 +181,7 @@ def _evidence(items: list[EvidenceRef]) -> str:
 def _section_span_ids(section) -> set[str]:
     output: set[str] = set()
     if isinstance(section, PersonalIntroduction):
-        claims = section.core_strengths + section.work_characteristics + section.career_direction
-        output.update(ref.span_id for claim in claims for ref in claim.evidence_refs)
-    elif isinstance(section, ProfessionalIntroduction):
-        claims = (
-            section.knowledge_domains
-            + section.skills
-            + section.research_interests
-            + section.certifications
-        )
-        output.update(ref.span_id for claim in claims for ref in claim.evidence_refs)
+        output.update(ref.span_id for item in section.items for ref in item.evidence_refs)
     elif isinstance(section, ExperienceSection):
         for entry in section.entries:
             output.update(ref.span_id for ref in entry.evidence_refs)

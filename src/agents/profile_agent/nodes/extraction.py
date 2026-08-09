@@ -16,8 +16,41 @@ CATEGORY_KEYWORDS = {
     FactCategory.PROJECT: ("项目", "系统", "平台", "开发", "设计", "技术栈", "github"),
     FactCategory.COMPETITION: ("比赛", "竞赛", "大赛", "奖项", "获奖", "一等奖", "二等奖"),
     FactCategory.INTERNSHIP: ("实习", "公司", "岗位", "部门", "企业", "工作"),
-    FactCategory.EDUCATION: ("大学", "学院", "学校", "本科", "硕士", "专业", "课程", "gpa"),
-    FactCategory.PROFESSIONAL: ("技能", "熟悉", "掌握", "研究", "方向", "证书", "python", "java"),
+    FactCategory.EDUCATION: (
+        "大学",
+        "学院",
+        "学校",
+        "本科",
+        "硕士",
+        "专业",
+        "课程",
+        "gpa",
+        "平均分",
+        "排名",
+        "雅思",
+        "托福",
+    ),
+    FactCategory.CAPABILITY: (
+        "技能",
+        "熟悉",
+        "掌握",
+        "研究",
+        "证书",
+        "python",
+        "java",
+    ),
+}
+
+PERSONAL_FIELD_PATTERNS = {
+    "name": (r"(?:姓名|name)\s*[:：]\s*([^|，,；;\n]+)",),
+    "birth_date": (r"(?:出生(?:年月|日期)?|生日|date of birth)\s*[:：]\s*([^|，,；;\n]+)",),
+    "hometown": (r"(?:籍贯|户籍|hometown)\s*[:：]\s*([^|，,；;\n]+)",),
+    "school": (r"(?:在读院校|当前学校|学校|院校)\s*[:：]\s*([^|，,；;\n]+)",),
+    "phone": (r"(?:手机(?:号码)?|电话|phone|tel)\s*[:：]?\s*(1[3-9]\d{9})",),
+    "email": (r"(?:邮箱|email|e-mail)\s*[:：]?\s*([\w.+-]+@[\w.-]+\.[A-Za-z]{2,})",),
+    "target_role": (r"(?:求职(?:意向|方向|目标)|目标岗位)\s*[:：]\s*([^|，,；;\n]+)",),
+    "portfolio": (r"(?:作品集|个人主页|portfolio)\s*[:：]?\s*(https?://\S+|\S+)",),
+    "location": (r"(?:所在城市|现居地|城市)\s*[:：]\s*([^|，,；;\n]+)",),
 }
 
 
@@ -90,6 +123,7 @@ def _materialize_facts(
                             "organization": draft.organization,
                             "period": draft.period,
                             "role": draft.role,
+                            "personal_field": draft.personal_field,
                         }.items()
                         if value
                     },
@@ -106,8 +140,12 @@ def _heuristic_facts(chunk: DocumentChunk) -> list[ProfileFact]:
         for piece in pieces:
             if len(piece) < 6:
                 continue
-            category = _guess_category(piece)
+            category = _guess_category(piece, span.section)
             metadata = {"fallback": True}
+            personal = _detect_personal_field(piece)
+            if personal:
+                category = FactCategory.PERSONAL
+                metadata.update({"personal_field": personal[0], "personal_value": personal[1]})
             if (
                 category
                 in {
@@ -118,7 +156,7 @@ def _heuristic_facts(chunk: DocumentChunk) -> list[ProfileFact]:
                 }
                 and span.section
             ):
-                metadata["experience_name"] = span.section
+                metadata["experience_name"] = _experience_name(category, piece, span.section)
             facts.append(
                 ProfileFact(
                     category=category,
@@ -133,12 +171,44 @@ def _heuristic_facts(chunk: DocumentChunk) -> list[ProfileFact]:
     return facts[:100]
 
 
-def _guess_category(text: str) -> FactCategory:
-    lowered = text.lower()
+def _guess_category(text: str, section: str | None = None) -> FactCategory:
+    if "奖学金" in text or any(token in text for token in ("优秀学生", "三好学生", "校级荣誉")):
+        return FactCategory.EDUCATION
+    if "证书" in text and not any(token in text for token in ("竞赛", "比赛", "大赛")):
+        return FactCategory.CAPABILITY
+    lowered = f"{section or ''} {text}".lower()
     for category, keywords in CATEGORY_KEYWORDS.items():
         if any(keyword in lowered for keyword in keywords):
             return category
     return FactCategory.PERSONAL
+
+
+def _experience_name(category: FactCategory, text: str, section: str) -> str:
+    if category != FactCategory.COMPETITION:
+        return section
+    cleaned = re.sub(
+        r"^(?:获得|荣获|参加)\s*",
+        "",
+        text,
+    )
+    parts = re.split(
+        r"\s+(?:国家级|省级|市级|校级|一等奖|二等奖|三等奖|金奖|银奖|铜奖|获奖)",
+        cleaned,
+        maxsplit=1,
+    )
+    candidate = parts[0].strip(" ：:，,；;")
+    if any(token in candidate for token in ("竞赛", "比赛", "大赛", "杯", "Challenge")):
+        return candidate[:120]
+    return section
+
+
+def _detect_personal_field(text: str) -> tuple[str, str] | None:
+    for key, patterns in PERSONAL_FIELD_PATTERNS.items():
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return key, match.group(1).strip()
+    return None
 
 
 def _evidence_ref(span: SourceSpan) -> EvidenceRef:

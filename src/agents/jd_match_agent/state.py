@@ -18,6 +18,8 @@ class JDMatchAgentState(TypedDict, total=False):
     dimension_scores: dict[str, Any]
     keyword_coverage: dict[str, Any]
     fact_relevance: dict[str, float]
+    material_scores: dict[str, dict[str, Any]]
+    experience_matrix: list[dict[str, Any]]
     selected_entries: dict[str, list[dict[str, Any]]]
     selected_fact_ids: dict[str, list[str]]
     strengths: list[str]

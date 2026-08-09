@@ -4,8 +4,6 @@ from uuid import uuid4
 
 from campaigns.models import AggregateGap, BatchStatus, TailoringBatch
 from jobs.match_runner import MatchJobAction, MatchJobRunner
-from matching.materials import match_result_materials
-from matching.models import JDMatchResult
 from schema.profile_api import TaskStatus
 from storage.career_repositories import CareerRepository
 from storage.files import FileStorage
@@ -54,14 +52,6 @@ class BatchTailoringService:
                 raise KeyError(f"job:{job_id}")
             jobs.append(job)
         facts = self.profile_repository.get_facts(campaign.profile_task_id)
-        for previous_task in self.match_repository.list_tasks(campaign.profile_task_id):
-            if previous_task.result and previous_task.result.result_json:
-                facts.extend(
-                    match_result_materials(
-                        JDMatchResult.model_validate(previous_task.result.result_json),
-                        facts,
-                    )
-                )
         section_paths = write_profile_section_documents(
             profile_result,
             facts,

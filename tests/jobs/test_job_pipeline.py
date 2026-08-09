@@ -38,7 +38,7 @@ def test_high_priority_keyword_coverage_improves_job_score():
     )
     facts = [
         ProfileFact(
-            category=FactCategory.PROFESSIONAL,
+            category=FactCategory.CAPABILITY,
             statement="熟练使用 Python、FastAPI、SQL 和 Docker。",
             confidence=0.95,
         )

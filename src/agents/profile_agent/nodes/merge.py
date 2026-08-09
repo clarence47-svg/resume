@@ -2,6 +2,7 @@ import json
 import re
 from collections import defaultdict
 from difflib import SequenceMatcher
+from profile.competition_verification import verify_competition_facts
 from profile.models import FactCategory, ProfileFact
 from uuid import NAMESPACE_URL, uuid5
 
@@ -40,13 +41,37 @@ async def merge_facts(state: dict) -> dict:
     for batch in state.get("extracted_fact_batches", []):
         candidates.extend(ProfileFact.model_validate(item) for item in batch)
 
-    facts = _deduplicate(candidates)
+    facts = _deduplicate(_reclassify_non_competition_awards(candidates))
     facts, warnings = await group_material_facts(facts)
+    facts, verification_warnings = await verify_competition_facts(facts)
+    warnings.extend(verification_warnings)
     return {
         "facts": [fact.model_dump(mode="json") for fact in facts],
         "conflicts": [],
         "warnings": warnings,
     }
+
+
+def _reclassify_non_competition_awards(
+    facts: list[ProfileFact],
+) -> list[ProfileFact]:
+    output = []
+    for fact in facts:
+        if fact.category != FactCategory.COMPETITION:
+            output.append(fact)
+            continue
+        if "奖学金" in fact.statement or any(
+            token in fact.statement for token in ("优秀学生", "三好学生", "校级荣誉")
+        ):
+            output.append(fact.model_copy(update={"category": FactCategory.EDUCATION}))
+            continue
+        if "证书" in fact.statement and not any(
+            token in fact.statement for token in ("竞赛", "比赛", "大赛")
+        ):
+            output.append(fact.model_copy(update={"category": FactCategory.CAPABILITY}))
+            continue
+        output.append(fact)
+    return output
 
 
 async def group_material_facts(

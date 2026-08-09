@@ -7,7 +7,6 @@ from matching.models import JDMatchResult, TailoredTextSection
 
 SECTION_TITLES = {
     "personal_introduction": "个人介绍",
-    "professional_introduction": "专业介绍",
     "project_experiences": "项目经历",
     "competition_experiences": "比赛经历",
     "internship_experiences": "实习经历",

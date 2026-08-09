@@ -68,11 +68,15 @@ class FileStorage:
         task_dir = self.settings.resume_exports_dir / job_id / f"v{version}"
         task_dir.mkdir(parents=True, exist_ok=True)
         return {
-            "markdown": task_dir / "resume.md",
+            "markdown": task_dir / "06_最终简历.md",
             "html": task_dir / "resume.html",
             "docx": task_dir / "resume.docx",
             "pdf": task_dir / "resume.pdf",
+            "documents": task_dir,
         }
+
+    def resume_version_dir(self, job_id: str, version: int) -> Path:
+        return self.settings.resume_exports_dir / job_id / f"v{version}"
 
     def application_dir(self, application_id: str) -> Path:
         target = self.settings.applications_dir / application_id

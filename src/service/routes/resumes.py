@@ -3,9 +3,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
+from resumes.source_documents import RESUME_DOCUMENT_FILENAMES, resume_document_path
 from schema.resume_api import ResumeResponse
-from service.dependencies import get_career_repository
+from service.dependencies import get_career_repository, get_storage
 from storage.career_repositories import CareerRepository
+from storage.files import FileStorage
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
@@ -56,3 +58,26 @@ def export_resume(
         "pdf": "application/pdf",
     }[format]
     return FileResponse(path, media_type=media, filename=path.name)
+
+
+@router.get("/{resume_id}/documents/{document_key}")
+def export_resume_document(
+    resume_id: str,
+    document_key: str,
+    repository: CareerRepository = Depends(get_career_repository),
+    storage: FileStorage = Depends(get_storage),
+):
+    resume = repository.get_resume(resume_id)
+    if resume is None:
+        raise HTTPException(status_code=404, detail="简历版本不存在。")
+    if document_key not in RESUME_DOCUMENT_FILENAMES:
+        raise HTTPException(status_code=404, detail="岗位文档不存在。")
+    if document_key == "final_resume":
+        path = Path(resume.markdown_path)
+    else:
+        path = resume_document_path(
+            storage.resume_version_dir(resume.job_id, resume.version), document_key
+        )
+    if path is None or not path.exists():
+        raise HTTPException(status_code=404, detail="岗位文档尚未生成。")
+    return FileResponse(path, media_type="text/markdown", filename=path.name)

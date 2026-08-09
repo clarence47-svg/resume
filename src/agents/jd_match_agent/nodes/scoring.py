@@ -1,8 +1,15 @@
 from profile.models import FactCategory, ProfileFact, ProfileResult
 from profile.section_documents import extract_document_fact_ids
 
-from matching.models import JDAnalysis, KeywordCoverage, RequirementMatch, SupportLevel
-from matching.scoring import calculate_match_scores, fact_relevance_scores
+from matching.models import (
+    ExperienceMatrixRow,
+    JDAnalysis,
+    KeywordCoverage,
+    MaterialRelevanceScore,
+    RequirementMatch,
+    SupportLevel,
+)
+from matching.scoring import calculate_match_scores, material_relevance_scores
 from matching.section_documents import render_selected_section_documents
 
 EXPERIENCE_LIMITS = {
@@ -18,7 +25,8 @@ def score_and_select(state: dict) -> dict:
     facts = [ProfileFact.model_validate(item) for item in state.get("facts", [])]
     profile = ProfileResult.model_validate(state["profile_result"])
     overall, dimensions = calculate_match_scores(analysis.requirements, matches)
-    relevance = fact_relevance_scores(analysis.requirements, matches)
+    material_scores = material_relevance_scores(analysis, matches, facts)
+    relevance = {fact_id: score.overall for fact_id, score in material_scores.items()}
     section_fact_ids = {
         section_name: extract_document_fact_ids(content)
         for section_name, content in state.get("profile_sections", {}).items()
@@ -60,7 +68,6 @@ def score_and_select(state: dict) -> dict:
             reverse=True,
         )
         if relevance.get(fact.id, 0) > 0
-        and fact.id in section_fact_ids.get(FactCategory.PERSONAL.value, set())
     ][:12]
     keyword_coverage = _keyword_coverage(analysis, facts)
     requirement_map = {item.id: item for item in analysis.requirements}
@@ -79,6 +86,15 @@ def score_and_select(state: dict) -> dict:
         selected_entries,
         selected_fact_ids,
         analysis,
+        material_scores,
+    )
+    experience_matrix = _experience_matrix(
+        profile,
+        facts,
+        relevance,
+        material_scores,
+        section_fact_ids,
+        selected_entries,
     )
     return {
         "overall_score": overall,
@@ -87,6 +103,10 @@ def score_and_select(state: dict) -> dict:
         },
         "keyword_coverage": keyword_coverage.model_dump(mode="json"),
         "fact_relevance": relevance,
+        "material_scores": {
+            fact_id: score.model_dump(mode="json") for fact_id, score in material_scores.items()
+        },
+        "experience_matrix": [item.model_dump(mode="json") for item in experience_matrix],
         "selected_entries": selected_entries,
         "selected_fact_ids": selected_fact_ids,
         "tailored_profile_sections": tailored_profile_sections,
@@ -202,3 +222,61 @@ def _keyword_coverage(analysis: JDAnalysis, facts: list[ProfileFact]) -> Keyword
     missing = [item for item in analysis.keywords if item.casefold() not in searchable]
     ratio = len(matched) / len(analysis.keywords) if analysis.keywords else 1
     return KeywordCoverage(matched=matched, missing=missing, ratio=ratio)
+
+
+def _experience_matrix(
+    profile: ProfileResult,
+    facts: list[ProfileFact],
+    relevance: dict[str, float],
+    material_scores: dict[str, MaterialRelevanceScore],
+    section_fact_ids: dict[str, set[str]],
+    selected_entries: dict[str, list[dict]],
+) -> list[ExperienceMatrixRow]:
+    rows: list[ExperienceMatrixRow] = []
+    for category in (
+        FactCategory.PROJECT,
+        FactCategory.COMPETITION,
+        FactCategory.INTERNSHIP,
+    ):
+        ranked = _rank_entries(
+            getattr(profile, category.value).entries,
+            facts,
+            relevance,
+            None,
+            section_fact_ids.get(category.value, set()),
+        )
+        selected_sets = [set(item["fact_ids"]) for item in selected_entries.get(category.value, [])]
+        for item in ranked:
+            fact_ids = item["fact_ids"]
+            rows.append(
+                ExperienceMatrixRow(
+                    category=category,
+                    name=item["entry"].get("name") or "经历",
+                    source_fact_ids=fact_ids,
+                    relevance=_aggregate_scores(fact_ids, material_scores),
+                    selected=any(set(fact_ids).intersection(value) for value in selected_sets),
+                )
+            )
+    return rows
+
+
+def _aggregate_scores(
+    fact_ids: list[str], material_scores: dict[str, MaterialRelevanceScore]
+) -> MaterialRelevanceScore:
+    scores = [material_scores[fact_id] for fact_id in fact_ids if fact_id in material_scores]
+    if not scores:
+        return MaterialRelevanceScore()
+    capability_ids = {
+        capability_id for score in scores for capability_id in score.capability_scores
+    }
+    return MaterialRelevanceScore(
+        direct_match=max(item.direct_match for item in scores),
+        transferable=max(item.transferable for item in scores),
+        adjacent=max(item.adjacent for item in scores),
+        impact=max(item.impact for item in scores),
+        overall=max(item.overall for item in scores),
+        capability_scores={
+            capability_id: max(item.capability_scores.get(capability_id, 0) for item in scores)
+            for capability_id in capability_ids
+        },
+    )

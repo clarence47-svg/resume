@@ -26,12 +26,11 @@ st.set_page_config(
 )
 
 DIMENSIONS = [
-    ("personal_introduction", "个人介绍", "个人定位、优势与职业方向"),
-    ("professional_introduction", "专业介绍", "知识结构、技能与研究方向"),
-    ("project_experiences", "项目经历", "项目行动、方法与成果"),
-    ("competition_experiences", "比赛经历", "竞赛贡献、奖项与成长"),
-    ("internship_experiences", "实习经历", "岗位职责、成果与协作"),
-    ("education_history", "学校履历", "教育背景、课程与荣誉"),
+    ("personal_introduction", "个人信息", "姓名、联系方式、学校与求职方向"),
+    ("project_experiences", "项目经历", "语义聚合后的完整项目素材"),
+    ("competition_experiences", "比赛经历", "经联网核验的赛事、贡献与奖项"),
+    ("internship_experiences", "实习经历", "语义聚合后的职责、成果与协作"),
+    ("education_history", "学校履历", "学校、成绩、排名、语言与课程"),
 ]
 
 STATUS_META = {
@@ -135,12 +134,20 @@ def inject_theme() -> None:
                 radial-gradient(circle at 15% 5%, rgba(118, 107, 255, .30), transparent 33%),
                 linear-gradient(180deg, #171a2d 0%, #101321 58%, #0d101b 100%);
             border-right: 1px solid rgba(255,255,255,.06);
+            height: 100vh !important;
+            min-height: 100vh !important;
+            overflow-y: auto !important;
         }
         [data-testid="stMain"] {
             margin-left: 292px !important;
             width: calc(100% - 292px) !important;
         }
-        [data-testid="stSidebarContent"] { padding: 1.4rem 1.15rem 1.5rem; }
+        [data-testid="stSidebarContent"] {
+            padding: 1.4rem 1.15rem 1.5rem;
+            min-height: 100vh !important;
+            display: flex;
+            flex-direction: column;
+        }
         [data-testid="stSidebarCollapseButton"] { display: none !important; }
         [data-testid="stSidebar"] * { color: #eef0ff; }
         [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #aeb4cc; }
@@ -201,7 +208,7 @@ def inject_theme() -> None:
         .sidebar-stat strong { display: block; font-size: 1.03rem; color: #fff; }
         .sidebar-stat span { color: #8d95af; font-size: .68rem; }
         .sidebar-footer {
-            margin-top: 1.2rem; padding: .85rem; border-radius: 12px;
+            margin-top: auto; padding: .85rem; border-radius: 12px;
             background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);
             color: #8f96af; font-size: .72rem; line-height: 1.55;
         }
@@ -233,6 +240,28 @@ def inject_theme() -> None:
             padding: 1.15rem 1.25rem; border: 1px solid var(--line); border-radius: 17px;
             background: rgba(255,255,255,.92); box-shadow: 0 8px 28px rgba(32,42,73,.045);
             margin-bottom: .85rem;
+        }
+        .profile-task-heading {
+            padding: .2rem 0 .55rem;
+        }
+        .profile-task-heading strong {
+            display: block; color: #202a3c; font-size: .9rem; letter-spacing: -.01em;
+        }
+        .profile-task-heading span { color: #8a93a4; font-size: .7rem; }
+        .compact-task-title { font-size: 1.1rem; font-weight: 760; color: #1d2638; }
+        .compact-task-meta { margin-top: .22rem; color: #7c8597; font-size: .72rem; }
+        .pool-title-row { display: flex; align-items: baseline; gap: .8rem; }
+        .pool-title-row h3 { margin: 0; font-size: 1.08rem; color: #1d2638; }
+        .pool-title-row span { color: #7c8597; font-size: .72rem; }
+        .personal-card {
+            min-height: 98px; padding: .95rem 1rem; border-radius: 15px;
+            border: 1px solid #e5e8ef; background: linear-gradient(145deg,#fff,#f9faff);
+            box-shadow: 0 7px 22px rgba(38,46,74,.045);
+        }
+        .personal-label { color: #7b8496; font-size: .7rem; font-weight: 700; }
+        .personal-value {
+            margin-top: .38rem; color: #1e273a; font-size: .98rem; font-weight: 720;
+            word-break: break-word;
         }
         .task-title { font-size: 1.16rem; font-weight: 740; color: var(--ink); }
         .task-meta { color: var(--muted); font-size: .73rem; margin-top: .25rem; }
@@ -284,12 +313,25 @@ def inject_theme() -> None:
         [data-testid="stFileUploaderDropzone"] {
             border-radius: 15px; border: 1.5px dashed #cfd4e1; background: #fafbfe; padding: 1.25rem;
         }
-        .stTabs [data-baseweb="tab-list"] {
-            gap: .35rem; background: #ebeef4; padding: .34rem; border-radius: 13px; width: fit-content;
+        [data-testid="stTabs"] [role="tablist"] {
+            display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: .45rem; width: 100%; background: white; padding: .45rem;
+            border: 1px solid #e4e7ee; border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(32,42,73,.05);
         }
-        .stTabs [data-baseweb="tab"] { border-radius: 9px; padding: .45rem .78rem; height: auto; }
-        .stTabs [aria-selected="true"] { background: white; box-shadow: 0 3px 10px rgba(36,43,67,.08); }
-        .stTabs [data-baseweb="tab-highlight"] { display: none; }
+        [data-testid="stTabs"] [data-testid="stTab"] {
+            justify-content: center; border-radius: 11px; padding: .65rem .8rem; height: auto;
+            color: #6f788b !important; font-weight: 680;
+        }
+        [data-testid="stTabs"] [data-testid="stTab"][aria-selected="true"] {
+            color: #5148d1 !important;
+            background: linear-gradient(135deg, #f0efff, #eaf9fb);
+            box-shadow: inset 0 0 0 1px #d9d6ff, 0 4px 12px rgba(80,70,205,.08);
+        }
+        [data-testid="stTabs"] [data-testid="stTab"][aria-selected="true"] p {
+            color: #5148d1 !important;
+        }
+        [data-testid="stTabs"] .react-aria-SelectionIndicator { display: none !important; }
         [data-testid="stExpander"] { border: 1px solid var(--line); border-radius: 13px; background: #fff; }
         [data-testid="stDataFrame"] { border: 1px solid var(--line); border-radius: 13px; overflow: hidden; }
         [data-testid="stProgress"] [role="progressbar"] > div {
@@ -300,6 +342,7 @@ def inject_theme() -> None:
             [data-testid="stMainBlockContainer"] { padding: 1.2rem 1rem 3rem; }
             .page-hero { padding: 1.35rem 1.2rem; }
             .hero-title { font-size: 1.55rem; }
+            [data-testid="stTabs"] [role="tablist"] { grid-template-columns: 1fr 1fr; }
         }
         </style>
         """,
@@ -345,34 +388,43 @@ def render_profile_workspace(client: ProfileClient) -> None:
 
     render_page_header(
         "Profile Builder",
-        "把零散资料整理成清晰的六维画像",
-        "上传 Word、PDF、Markdown 或 PowerPoint。Agent 会解析证据、聚合同一经历，并生成六份可追溯画像文档。",
+        "把零散资料整理成清晰的五维画像",
+        "上传 Word、PDF、Markdown 或 PowerPoint。Agent 会解析证据、聚合同一经历，并生成五份可追溯画像文档。",
     )
     labels = {task["id"]: task_label(task) for task in tasks}
     options = ["", *list(labels)]
     prepare_selector(PROFILE_SELECTOR_KEY, options)
-    metric_col, spacer_col, selector_col, delete_col = st.columns(
-        [1.1, 1.2, 2.5, 0.7], vertical_alignment="bottom"
-    )
+    metric_col, selector_col = st.columns([1.05, 3.4], vertical_alignment="top")
     with metric_col:
         render_metric_card("历史画像", str(len(tasks)), "持续保留，可随时重新生成")
-    with spacer_col:
-        st.empty()
     with selector_col:
-        selected = st.selectbox(
-            "我的画像任务",
-            options=options,
-            format_func=lambda value: "＋ 创建新画像" if not value else labels[value],
-            key=PROFILE_SELECTOR_KEY,
-        )
-    with delete_col:
-        delete_clicked = st.button(
-            "删除",
-            key="page-delete-profile",
-            disabled=not selected,
-            help="删除当前画像；处理中任务会立即取消",
-            use_container_width=True,
-        )
+        with st.container(border=True):
+            st.markdown(
+                """
+                <div class="profile-task-heading">
+                    <strong>我的画像任务</strong>
+                    <span>选择历史画像，或返回创建一份新画像</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            picker_col, delete_col = st.columns([5, 1], vertical_alignment="bottom")
+            with picker_col:
+                selected = st.selectbox(
+                    "画像任务",
+                    options=options,
+                    format_func=lambda value: "＋ 创建新画像" if not value else labels[value],
+                    key=PROFILE_SELECTOR_KEY,
+                    label_visibility="collapsed",
+                )
+            with delete_col:
+                delete_clicked = st.button(
+                    "删除",
+                    key="page-delete-profile",
+                    disabled=not selected,
+                    help="删除当前画像；处理中任务会立即取消",
+                    use_container_width=True,
+                )
     if delete_clicked:
         delete_profile_task(client, selected)
     if selected:
@@ -798,14 +850,14 @@ def render_resume_studio(
     match_client: MatchClient,
     career_client: CareerClient,
 ) -> None:
-    match_tab, resume_tab = st.tabs(["六维 JD 匹配", "ATS 简历版本"])
+    match_tab, resume_tab = st.tabs(["五维 JD 匹配", "ATS 简历版本"])
     with match_tab:
         render_match_workspace(profile_client, match_client)
     with resume_tab:
         render_page_header(
             "Resume Studio",
             "从匹配结果生成 ATS 简历",
-            "支持标准、学生紧凑和技术三种模板，并导出 Markdown、HTML、DOCX 与 PDF。",
+            "每个版本生成五份岗位素材母版和一份最终简历，并支持 ATS 多格式导出。",
         )
         try:
             jobs = [item.get("job", item) for item in career_client.list_jobs()]
@@ -882,6 +934,36 @@ def render_resume_studio(
                             use_container_width=True,
                             key=f"resume-download-{resume['id']}-{file_format}",
                         )
+                with st.expander("下载本岗位六份 Markdown 文档"):
+                    documents = [
+                        ("personal_introduction", "1. 个人信息"),
+                        ("project_experiences", "2. 项目经历"),
+                        ("competition_experiences", "3. 比赛经历"),
+                        ("internship_experiences", "4. 实习经历"),
+                        ("education_history", "5. 学校履历"),
+                        ("final_resume", "6. 最终简历"),
+                    ]
+                    for start in range(0, len(documents), 3):
+                        document_columns = st.columns(3)
+                        for column, (document_key, label) in zip(
+                            document_columns, documents[start : start + 3], strict=False
+                        ):
+                            with column:
+                                try:
+                                    data = career_client.download_resume_document(
+                                        resume["id"], document_key
+                                    )
+                                except CareerClientError:
+                                    data = b""
+                                st.download_button(
+                                    label,
+                                    data=data,
+                                    file_name=f"{label.replace('. ', '_')}.md",
+                                    mime="text/markdown",
+                                    disabled=not data,
+                                    use_container_width=True,
+                                    key=f"resume-document-{resume['id']}-{document_key}",
+                                )
                 materials = document.get("application_materials", {})
                 with st.expander("查看 Cover Letter、BOSS 招呼语和表单答案"):
                     st.markdown("#### Cover Letter")
@@ -1145,18 +1227,29 @@ def render_task(client: ProfileClient, task_id: str) -> None:
     except ProfileClientError as exc:
         st.error(str(exc))
         return
-    render_task_banner(task, "资料画像任务")
-    control_col, progress_col = st.columns([1, 4], vertical_alignment="center")
-    with control_col:
-        if st.button("↻ 刷新状态", use_container_width=True, key=f"refresh-profile-{task_id}"):
-            st.rerun()
-    with progress_col:
-        st.progress(
-            task["progress"] / 100, text=f"{stage_label(task['stage'])} · {task['progress']}%"
+    title_col, status_col = st.columns([5.2, 1], vertical_alignment="top")
+    with title_col:
+        st.markdown(
+            f"""
+            <div style="padding:.45rem 0 .35rem;">
+                <div class="compact-task-title">{html.escape(task["title"])}</div>
+                <div class="compact-task-meta">资料画像任务 · 创建于 {html.escape(format_time(task.get("created_at")))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
+    with status_col:
+        label, icon, tone = status_meta(task["status"])
+        st.markdown(
+            f'<div style="text-align:center;margin-bottom:.35rem;"><span class="status-pill status-{tone}">{icon} {label}</span></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("刷新状态", use_container_width=True, key=f"refresh-profile-{task_id}"):
+            st.rerun()
+    st.progress(task["progress"] / 100, text=f"{stage_label(task['stage'])} · {task['progress']}%")
     if task.get("error") and "未解决冲突" not in task["error"]:
         st.warning(task["error"])
-    render_profile_pool(task)
+    render_profile_pool(client, task)
 
     status = task["status"]
     if status in {"completed", "partial_success"}:
@@ -1178,10 +1271,58 @@ def render_task(client: ProfileClient, task_id: str) -> None:
     )
 
 
-def render_profile_pool(task: dict) -> None:
+def render_profile_pool(client: ProfileClient, task: dict) -> None:
     documents = task.get("documents", [])
-    st.markdown("### 画像池")
-    st.caption(f"当前任务共保存 {len(documents)} 份资料，文件状态会随解析进度更新。")
+    title_col, action_col = st.columns([5, 1], vertical_alignment="center")
+    with title_col:
+        st.markdown(
+            f"""
+            <div class="pool-title-row">
+                <h3>画像池</h3>
+                <span>当前保存 {len(documents)} 份资料，文件状态会随解析进度更新</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with action_col:
+        with st.popover("＋ 补充资料", width="stretch"):
+            supplement_files = st.file_uploader(
+                "继续添加简历或经历资料",
+                type=["doc", "docx", "pdf", "md", "ppt", "pptx"],
+                accept_multiple_files=True,
+                key=f"supplement-files-{task['id']}",
+            )
+            active = task["status"] in {
+                "queued",
+                "parsing",
+                "extracting",
+                "generating",
+                "auditing",
+            }
+            if active:
+                st.caption("当前任务处理中，完成后即可继续补充。")
+            if st.button(
+                "保存并重新整理",
+                type="primary",
+                use_container_width=True,
+                disabled=active or not supplement_files,
+                key=f"supplement-submit-{task['id']}",
+            ):
+                fingerprint = profile_submission_fingerprint(
+                    f"supplement:{task['id']}", supplement_files
+                )
+                if is_duplicate_submission("profile-supplement", fingerprint):
+                    st.toast("这些资料刚刚已保存，请勿重复点击。", icon="ℹ️")
+                else:
+                    try:
+                        response = client.add_documents(task["id"], supplement_files)
+                        remember_submission("profile-supplement", fingerprint)
+                        set_flash(
+                            f"补充资料已保存，共新增 {response['added_count']} 份，画像已重新进入处理队列。"
+                        )
+                        st.rerun()
+                    except ProfileClientError as exc:
+                        st.error(str(exc))
     if not documents:
         render_empty("当前任务暂时没有可显示的资料文件。")
         return
@@ -1212,15 +1353,7 @@ def render_profile_pool(task: dict) -> None:
 def render_result(client: ProfileClient, task_id: str) -> None:
     result = client.get_result(task_id)
     render_section_heading(
-        "六维画像", "每个维度均可单独下载 Markdown，并保留事实、置信度和证据来源。"
-    )
-    render_metric_row(
-        [
-            ("引用覆盖率", f"{result['audit']['citation_coverage']:.0%}", "事实均尽量关联原始证据"),
-            ("素材聚合", "已开启", "不同岗位表达作为互补素材保留"),
-            ("生成模型", result.get("model") or "规则回退", "当前画像生成引擎"),
-            ("生成时间", format_time(result.get("generated_at"), short=True), "最近一次结果版本"),
-        ]
+        "五维画像", "每个维度均可单独下载 Markdown，并保留事实、置信度和证据来源。"
     )
     tabs = st.tabs([label for _, label, _ in DIMENSIONS])
     for tab, (key, label, description) in zip(tabs, DIMENSIONS, strict=True):
@@ -1260,22 +1393,40 @@ def render_result(client: ProfileClient, task_id: str) -> None:
 
 def render_profile_dimension(section_name: str, section: dict) -> None:
     overview = section.get("overview") or "资料未提供足够信息。"
-    st.markdown(f'<div class="soft-panel">{html.escape(overview)}</div>', unsafe_allow_html=True)
     if section_name == "personal_introduction":
-        render_claim_group("核心优势", section.get("core_strengths", []))
-        render_claim_group("工作特点", section.get("work_characteristics", []))
-        render_claim_group("职业方向", section.get("career_direction", []))
-        render_chips(section.get("keywords", []))
-    elif section_name == "professional_introduction":
-        render_claim_group("知识结构", section.get("knowledge_domains", []))
-        render_claim_group("专业技能", section.get("skills", []))
-        render_claim_group("研究兴趣", section.get("research_interests", []))
-        render_claim_group("证书", section.get("certifications", []))
-        render_chips(section.get("tools_and_technologies", []), "cyan")
+        render_personal_information(section.get("items", []))
     elif section_name == "education_history":
+        st.markdown(
+            f'<div class="soft-panel">{html.escape(overview)}</div>',
+            unsafe_allow_html=True,
+        )
         render_education_entries(section.get("entries", []))
     else:
-        render_experience_entries(section.get("entries", []))
+        st.markdown(
+            f'<div class="soft-panel">{html.escape(overview)}</div>',
+            unsafe_allow_html=True,
+        )
+        render_experience_entries(section.get("entries", []), section_name)
+
+
+def render_personal_information(items: list[dict]) -> None:
+    if not items:
+        render_empty("资料中暂未识别到姓名、电话、邮箱、求职方向等基本信息。")
+        return
+    for offset in range(0, len(items), 3):
+        columns = st.columns(3)
+        for column, item in zip(columns, items[offset : offset + 3], strict=False):
+            with column:
+                st.markdown(
+                    f"""
+                    <div class="personal-card">
+                        <div class="personal-label">{html.escape(item.get("label", "基本信息"))}</div>
+                        <div class="personal-value">{html.escape(item.get("value", ""))}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                render_evidence(item.get("evidence_refs", []), "来源证据")
 
 
 def render_claim_group(title: str, claims: list[dict]) -> None:
@@ -1293,7 +1444,7 @@ def render_claim_group(title: str, claims: list[dict]) -> None:
             render_evidence(claim.get("evidence_refs", []), "查看证据")
 
 
-def render_experience_entries(entries: list[dict]) -> None:
+def render_experience_entries(entries: list[dict], section_name: str) -> None:
     if not entries:
         render_empty("该维度暂未识别到经历。")
         return
@@ -1305,6 +1456,11 @@ def render_experience_entries(entries: list[dict]) -> None:
                 entry.get("role") or "角色未提供",
             ]
             st.caption("  ·  ".join(meta))
+            if section_name == "competition_experiences":
+                attributes = entry.get("attributes", {})
+                matched_name = attributes.get("verification_matched_name")
+                if matched_name:
+                    st.success(f"已联网核验：{matched_name}", icon="✓")
             st.markdown(entry.get("summary") or "")
             render_chips(entry.get("technologies", []), "cyan")
             for title, claims in (
@@ -1316,6 +1472,24 @@ def render_experience_entries(entries: list[dict]) -> None:
                     for claim in claims:
                         st.markdown(f"- {claim['content']}")
             render_evidence(entry.get("evidence_refs", []), "来源证据")
+            if section_name == "competition_experiences":
+                render_competition_sources(entry.get("attributes", {}))
+
+
+def render_competition_sources(attributes: dict) -> None:
+    raw_sources = attributes.get("verification_sources")
+    if not raw_sources:
+        return
+    try:
+        sources = json.loads(raw_sources)
+    except (TypeError, json.JSONDecodeError):
+        return
+    with st.expander(f"联网核验来源 · {len(sources)} 条"):
+        for source in sources:
+            title = source.get("title") or source.get("url") or "核验来源"
+            url = source.get("url") or ""
+            if url:
+                st.markdown(f"- [{title}]({url})")
 
 
 def render_education_entries(entries: list[dict]) -> None:
@@ -1334,8 +1508,21 @@ def render_education_entries(entries: list[dict]) -> None:
                 )
             )
             st.markdown(entry.get("overview") or "")
+            education_meta = [
+                ("平均成绩", entry.get("average_score")),
+                ("排名", entry.get("ranking")),
+                ("综合评价", entry.get("evaluation")),
+            ]
+            available_meta = [(label, value) for label, value in education_meta if value]
+            if available_meta:
+                columns = st.columns(len(available_meta))
+                for column, (label, value) in zip(columns, available_meta, strict=True):
+                    column.metric(label, value)
+            if entry.get("language_scores"):
+                st.markdown("**语言成绩**")
+                render_chips(entry["language_scores"], "cyan")
             if entry.get("courses"):
-                st.markdown("**相关课程**")
+                st.markdown("**核心课程**")
                 render_chips(entry["courses"], "gray")
             for title, claims in (
                 ("荣誉", entry.get("honors", [])),
@@ -1352,7 +1539,7 @@ def render_match_create(client: MatchClient, profiles: list[dict], matches: list
     render_page_header(
         "JD Tailoring",
         "用岗位能力重新组织你的最佳材料",
-        "Agent 会联网研究同类岗位，识别核心能力，再从六份画像文档中挑选最相关的事实生成投递文案。",
+        "Agent 会联网研究同类岗位，识别核心能力，再从五份画像文档中挑选最相关的事实生成投递文案。",
     )
     render_metric_row(
         [
@@ -1362,7 +1549,7 @@ def render_match_create(client: MatchClient, profiles: list[dict], matches: list
             ("事实边界", "严格", "强化表达，不新增硬事实"),
         ]
     )
-    render_section_heading("创建岗位匹配", "粘贴完整 JD 能获得更准确的岗位研究与六维匹配。")
+    render_section_heading("创建岗位匹配", "粘贴完整 JD 能获得更准确的岗位研究与五维匹配。")
     if not profiles:
         render_empty("请先完成至少一个资料画像任务，再创建 JD 匹配。")
         return
@@ -1413,7 +1600,7 @@ def render_match_task(client: MatchClient, match_id: str) -> None:
     render_page_header(
         "Match Task",
         task["title"],
-        "查看岗位研究、匹配评分和针对 JD 优化后的六维简历文案。",
+        "查看岗位研究、匹配评分和针对 JD 优化后的五维简历文案。",
     )
     render_task_banner(task, "JD 岗位匹配")
     refresh_col, progress_col = st.columns([1, 4], vertical_alignment="center")
@@ -1463,11 +1650,15 @@ def render_match_result(client: MatchClient, match_id: str) -> None:
         ]
     )
     render_dimension_scores(result["dimension_scores"])
+    render_dynamic_capability_matrix(
+        result.get("jd_analysis", {}).get("capability_dimensions", []),
+        result.get("experience_matrix", []),
+    )
     render_role_research(research)
     render_strengths_and_gaps(result["strengths"], result["gaps"])
     render_keyword_coverage(result["keyword_coverage"])
 
-    render_section_heading("六维投递文案", "内容可编辑；保存时会重新执行硬事实与技能审计。")
+    render_section_heading("五维投递文案", "内容可编辑；保存时会重新执行硬事实与技能审计。")
     updates: list[dict] = []
     tabs = st.tabs([label for _, label, _ in DIMENSIONS])
     for tab, (section_name, label, description) in zip(tabs, DIMENSIONS, strict=True):
@@ -1495,6 +1686,15 @@ def render_match_result(client: MatchClient, match_id: str) -> None:
                 )
                 if value.strip() != unit["content"]:
                     updates.append({"unit_id": unit["id"], "content": value.strip()})
+                relevance = unit.get("relevance_breakdown", {})
+                if relevance.get("overall"):
+                    st.caption(
+                        f"相关度 {relevance['overall']:.1f} · "
+                        f"直接 {relevance.get('direct_match', 0):.0f} · "
+                        f"迁移 {relevance.get('transferable', 0):.0f} · "
+                        f"相邻 {relevance.get('adjacent', 0):.0f} · "
+                        f"影响 {relevance.get('impact', 0):.0f}"
+                    )
                 render_evidence(unit.get("evidence_refs", []), f"{field_label} · 证据")
     action_col, info_col = st.columns([1, 3], vertical_alignment="center")
     if action_col.button(
@@ -1532,7 +1732,7 @@ def render_match_result(client: MatchClient, match_id: str) -> None:
 
 
 def render_dimension_scores(scores: dict) -> None:
-    render_section_heading("六维匹配分布", "快速判断哪些材料最适合当前岗位。")
+    render_section_heading("五维匹配分布", "快速判断哪些材料最适合当前岗位。")
     labels = {key: label for key, label, _ in DIMENSIONS}
     items = list(scores.items())
     for start in range(0, len(items), 3):
@@ -1550,6 +1750,41 @@ def render_dimension_scores(scores: dict) -> None:
                         f"匹配 {len(value['matched_requirement_ids'])} 项 · "
                         f"缺失 {len(value['missing_requirement_ids'])} 项"
                     )
+
+
+def render_dynamic_capability_matrix(dimensions: list[dict], rows: list[dict]) -> None:
+    render_section_heading(
+        "岗位动态能力矩阵",
+        "能力维度只针对当前 JD 生成；经历池来自本次画像快照，不读取历史岗位文案。",
+    )
+    if dimensions:
+        render_chips([item["name"] for item in dimensions], "cyan")
+    if not rows:
+        render_empty("当前画像中没有可参与岗位排序的项目、比赛或实习经历。")
+        return
+    dimension_names = {item["id"]: item["name"] for item in dimensions}
+    category_labels = {
+        "project_experiences": "项目",
+        "competition_experiences": "比赛",
+        "internship_experiences": "实习",
+    }
+    table = []
+    for row in rows:
+        relevance = row.get("relevance", {})
+        item = {
+            "入选": "✓" if row.get("selected") else "",
+            "类型": category_labels.get(row.get("category"), row.get("category")),
+            "经历": row.get("name"),
+            "综合分": relevance.get("overall", 0),
+            "直接匹配": relevance.get("direct_match", 0),
+            "可迁移": relevance.get("transferable", 0),
+            "相邻经验": relevance.get("adjacent", 0),
+            "成果影响": relevance.get("impact", 0),
+        }
+        for dimension_id, score in relevance.get("capability_scores", {}).items():
+            item[dimension_names.get(dimension_id, dimension_id)] = score
+        table.append(item)
+    st.dataframe(table, hide_index=True, use_container_width=True)
 
 
 def render_role_research(research: dict) -> None:
@@ -1884,7 +2119,7 @@ def stage_label(stage: str) -> str:
         "parsing_documents": "解析文档",
         "extracting_facts": "提取事实",
         "awaiting_review": "等待事实核对",
-        "generating_profile": "生成六维画像",
+        "generating_profile": "生成五维画像",
         "regenerating_profile": "重新生成画像",
         "analyzing_jd": "分析岗位信息",
         "matching": "匹配岗位能力",

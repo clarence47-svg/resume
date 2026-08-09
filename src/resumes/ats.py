@@ -44,7 +44,6 @@ def _resume_text(document: ResumeDocument) -> str:
         document.name,
         document.target_title,
         document.summary,
-        document.professional_overview,
     ]
     values.extend(document.skills)
     for group in (document.projects, document.competitions, document.internships):

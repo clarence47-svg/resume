@@ -21,7 +21,7 @@ def _create_profile(client: TestClient) -> str:
         files={
             "files": (
                 "resume.md",
-                "# 专业介绍\n熟练使用 Python 和 FastAPI。\n"
+                "# 能力素材\n熟练使用 Python 和 FastAPI。\n"
                 "# 项目经历\n使用 Python 完成后端系统开发。",
                 "text/markdown",
             )

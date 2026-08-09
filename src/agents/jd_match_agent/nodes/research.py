@@ -254,7 +254,7 @@ def _category(text: str) -> FactCategory:
         return FactCategory.PROJECT
     if any(token in text for token in ("沟通", "协作", "责任", "学习", "表达")):
         return FactCategory.PERSONAL
-    return FactCategory.PROFESSIONAL
+    return FactCategory.CAPABILITY
 
 
 def _dedupe(items: list[str]) -> list[str]:

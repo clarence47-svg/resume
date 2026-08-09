@@ -25,6 +25,7 @@ def route_sections(state: JDMatchAgentState):
             "selected_entries",
             "selected_fact_ids",
             "fact_relevance",
+            "material_scores",
         )
     }
     return [Send("generate_section", {**shared, "section_name": name}) for name in SECTION_NAMES]

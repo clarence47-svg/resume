@@ -12,8 +12,6 @@ from profile.section_documents import SECTION_FILENAMES
 import pytest
 
 from agents.jd_match_agent.graph import build_graph
-from matching.materials import match_result_materials
-from matching.models import JDMatchResult
 
 
 @pytest.mark.asyncio
@@ -65,6 +63,8 @@ async def test_jd_match_graph_limits_project_entries(tmp_path: Path) -> None:
     )
     assert len(output["result"]["project_experiences"]["entries"]) <= 3
     assert output["result"]["audit"]["passed"] is True
+    assert output["result"]["jd_analysis"]["capability_dimensions"]
+    assert output["result"]["material_scores"]
     project_master = output["result"]["section_documents"][FactCategory.PROJECT.value]
     assert project_master.startswith("# 画像母版_项目经历")
     assert project_master.count("## 项目") <= 3
@@ -78,12 +78,11 @@ async def test_jd_match_graph_limits_project_entries(tmp_path: Path) -> None:
     )
     assert section_path.exists()
     assert section_path.read_text(encoding="utf-8") == project_master
-    historical_materials = match_result_materials(
-        JDMatchResult.model_validate(output["result"]), facts
+    assert output["result"]["experience_matrix"]
+    assert all(
+        row["category"] == FactCategory.PROJECT.value
+        for row in output["result"]["experience_matrix"]
     )
-    assert historical_materials
-    assert all(material.evidence_refs for material in historical_materials)
-    assert any("Python" in material.statement for material in historical_materials)
 
 
 @pytest.mark.asyncio

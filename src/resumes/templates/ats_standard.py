@@ -6,7 +6,6 @@ from resumes.models import ResumeDocument
 def render_markdown(document: ResumeDocument) -> str:
     lines = [f"# {document.name or '候选人'}", document.contact_line]
     lines.extend(["", f"## 求职目标：{document.target_title}", "", "## 个人简介", document.summary])
-    lines.extend(["", "## 专业能力", document.professional_overview])
     if document.skills:
         lines.extend(["", "**技能关键词：** " + "、".join(document.skills)])
     _append_experiences(lines, "项目经历", document.projects)

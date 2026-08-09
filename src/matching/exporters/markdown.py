@@ -8,8 +8,7 @@ from matching.models import (
 )
 
 SECTION_TITLES = {
-    "personal_introduction": "个人介绍",
-    "professional_introduction": "专业介绍",
+    "personal_introduction": "个人信息",
     "project_experiences": "项目经历",
     "competition_experiences": "比赛经历",
     "internship_experiences": "实习经历",
@@ -37,9 +36,38 @@ def export_match_markdown(result: JDMatchResult, path: Path) -> Path:
         f"- 常见工具：{'、'.join(result.job_research.common_tools) or '未识别'}",
         f"- 市场关键词：{'、'.join(result.job_research.market_keywords) or '未识别'}",
         "",
-        "### 参考来源",
+        "## 岗位动态能力维度",
         "",
     ]
+    lines.extend(
+        f"- {item.name}：{item.description or '根据当前 JD 动态生成'}"
+        for item in result.jd_analysis.capability_dimensions
+    )
+    if not result.jd_analysis.capability_dimensions:
+        lines.append("- 当前 JD 未识别到能力维度。")
+    lines.extend(
+        [
+            "",
+            "## 经历相关度矩阵",
+            "",
+        ]
+    )
+    for row in result.experience_matrix:
+        selected = "已选择" if row.selected else "候选"
+        lines.append(
+            f"- [{selected}] {row.name}：综合 {row.relevance.overall:.1f}；"
+            f"直接 {row.relevance.direct_match:.1f}；迁移 {row.relevance.transferable:.1f}；"
+            f"相邻 {row.relevance.adjacent:.1f}；影响 {row.relevance.impact:.1f}"
+        )
+    if not result.experience_matrix:
+        lines.append("- 当前画像没有可参与排序的项目、比赛或实习经历。")
+    lines.extend(
+        [
+            "",
+            "### 参考来源",
+            "",
+        ]
+    )
     lines.extend(
         f"- [{source.title}]({source.url})：{source.snippet}"
         for source in result.job_research.sources

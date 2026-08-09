@@ -3,9 +3,8 @@ from profile.models import EvidenceRef, ExperienceSection, ProfileClaim, Profile
 
 
 def export_markdown(result: ProfileResult, path: Path) -> Path:
-    lines = ["# 用户六维画像", "", f"生成时间：{result.generated_at.isoformat()}", ""]
+    lines = ["# 用户五维画像", "", f"生成时间：{result.generated_at.isoformat()}", ""]
     lines.extend(_personal(result))
-    lines.extend(_professional(result))
     lines.extend(_experience("项目经历", result.project_experiences))
     lines.extend(_experience("比赛经历", result.competition_experiences))
     lines.extend(_experience("实习经历", result.internship_experiences))
@@ -20,6 +19,10 @@ def export_markdown(result: ProfileResult, path: Path) -> Path:
                 f"- 学历：{entry.degree or '资料未提供'}",
                 f"- 专业：{entry.major or '资料未提供'}",
                 f"- 时间：{entry.period or '资料未提供'}",
+                f"- 平均成绩：{entry.average_score or '资料未提供'}",
+                f"- 排名：{entry.ranking or '资料未提供'}",
+                f"- 综合评价：{entry.evaluation or '资料未提供'}",
+                f"- 语言成绩：{'、'.join(entry.language_scores) or '资料未提供'}",
                 f"- 课程：{'、'.join(entry.courses) or '资料未提供'}",
                 f"- 来源：{_evidence(entry.evidence_refs)}",
                 "",
@@ -35,28 +38,14 @@ def export_markdown(result: ProfileResult, path: Path) -> Path:
 
 def _personal(result: ProfileResult) -> list[str]:
     section = result.personal_introduction
-    lines = ["## 个人介绍", "", section.overview, ""]
-    lines.extend(
-        _claims(section.core_strengths + section.work_characteristics + section.career_direction)
-    )
-    if section.keywords:
-        lines.extend([f"关键词：{'、'.join(section.keywords)}", ""])
-    return lines
-
-
-def _professional(result: ProfileResult) -> list[str]:
-    section = result.professional_introduction
-    lines = ["## 专业介绍", "", section.overview, ""]
-    lines.extend(
-        _claims(
-            section.knowledge_domains
-            + section.skills
-            + section.research_interests
-            + section.certifications
+    lines = ["## 个人信息", "", section.overview, ""]
+    for item in section.items:
+        lines.append(
+            f"- {item.label}：{item.value}（置信度 {item.confidence:.0%}；"
+            f"来源：{_evidence(item.evidence_refs)}）"
         )
-    )
-    if section.tools_and_technologies:
-        lines.extend([f"工具与技术：{'、'.join(section.tools_and_technologies)}", ""])
+    if section.items:
+        lines.append("")
     return lines
 
 

@@ -1,3 +1,5 @@
+from profile.models import ProfileFact
+
 from career.service import CareerService
 from matching.models import JDMatchResult
 from resumes.ats import audit_resume
@@ -5,6 +7,7 @@ from resumes.composition import compose_resume
 from resumes.exporters import export_docx, export_html, export_markdown, export_pdf
 from resumes.models import ResumeTemplate, ResumeVersion
 from resumes.pagination import plan_pages
+from resumes.source_documents import write_resume_source_documents
 from storage.career_repositories import CareerRepository
 from storage.files import FileStorage
 from storage.repositories import MatchRepository
@@ -47,6 +50,11 @@ class ResumePipeline:
         document.audit = audit_resume(document, job.jd_text)
         version_number = self.career_repository.next_resume_version(job_id)
         paths = self.storage.resume_export_paths(job_id, version_number)
+        write_resume_source_documents(
+            result,
+            [ProfileFact.model_validate(item) for item in task.facts_snapshot],
+            paths["documents"],
+        )
         export_markdown(document, paths["markdown"])
         export_html(document, paths["html"])
         export_docx(document, paths["docx"])

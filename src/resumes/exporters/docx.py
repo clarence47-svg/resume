@@ -16,7 +16,6 @@ def export_docx(document: ResumeDocument, path: Path) -> Path:
         output.add_paragraph(document.contact_line)
     output.add_heading(f"求职目标：{document.target_title}", level=1)
     _paragraph_section(output, "个人简介", document.summary)
-    _paragraph_section(output, "专业能力", document.professional_overview)
     if document.skills:
         output.add_paragraph("技能关键词：" + "、".join(document.skills))
     _experience_section(output, "项目经历", document.projects)
