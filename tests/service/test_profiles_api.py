@@ -47,3 +47,19 @@ def test_profile_can_be_deleted_immediately_after_creation(test_settings) -> Non
 
         assert deleted.status_code == 200, deleted.text
         assert client.get(f"/profiles/{task_id}").status_code == 404
+
+
+def test_profile_creation_always_uses_auto_mode(test_settings) -> None:
+    app = create_app(test_settings)
+    with TestClient(app) as client:
+        response = client.post(
+            "/profiles",
+            files={"files": ("resume.md", "# 项目经历\n测试资料", "text/markdown")},
+            data={"review_mode": "pause", "title": "自动画像"},
+        )
+        assert response.status_code == 202
+        task_id = response.json()["task_id"]
+
+        task = client.get(f"/profiles/{task_id}").json()
+        assert task["review_mode"] == "auto"
+        client.delete(f"/profiles/{task_id}")

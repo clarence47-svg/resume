@@ -51,7 +51,6 @@ ACTIVE_STATUSES = {
 @router.post("", response_model=TaskCreated, status_code=status.HTTP_202_ACCEPTED)
 async def create_profile(
     files: list[UploadFile] = File(...),
-    review_mode: ReviewMode = Form(ReviewMode.AUTO),
     title: str = Form(""),
     repository: ProfileRepository = Depends(get_repository),
     storage: FileStorage = Depends(get_storage),
@@ -64,7 +63,7 @@ async def create_profile(
         raise HTTPException(status_code=400, detail=f"一次最多上传 {settings.max_files} 个文件。")
     task_id = str(uuid4())
     task_title = title.strip() or f"画像任务 {task_id[:8]}"
-    repository.create_task(task_id, task_title, review_mode)
+    repository.create_task(task_id, task_title, ReviewMode.AUTO)
     valid_count = 0
     total_size = 0
     errors: list[str] = []

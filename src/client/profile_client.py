@@ -13,7 +13,7 @@ class ProfileClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def create_profile(self, files, review_mode: str = "auto", title: str = "") -> dict:
+    def create_profile(self, files, title: str = "") -> dict:
         payload = []
         opened: list[BinaryIO] = []
         try:
@@ -28,7 +28,7 @@ class ProfileClient:
                 "POST",
                 "/profiles",
                 files=payload,
-                data={"review_mode": review_mode, "title": title},
+                data={"title": title},
             ).json()
         finally:
             for handle in opened:

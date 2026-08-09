@@ -343,28 +343,32 @@ def render_profile_workspace(client: ProfileClient) -> None:
         st.error(f"无法连接 Agent 服务：{exc}")
         return
 
-    completed = sum(item["status"] in {"completed", "partial_success"} for item in tasks)
-    active = sum(
-        item["status"] in {"queued", "parsing", "extracting", "generating"} for item in tasks
+    render_page_header(
+        "Profile Builder",
+        "把零散资料整理成清晰的六维画像",
+        "上传 Word、PDF、Markdown 或 PowerPoint。Agent 会解析证据、聚合同一经历，并生成六份可追溯画像文档。",
     )
-    render_sidebar_stats(len(tasks), completed, active)
     labels = {task["id"]: task_label(task) for task in tasks}
-    st.sidebar.markdown('<div class="sidebar-label">Profile Tasks</div>', unsafe_allow_html=True)
     options = ["", *list(labels)]
     prepare_selector(PROFILE_SELECTOR_KEY, options)
-    selector_col, delete_col = st.sidebar.columns([4.6, 1.4], vertical_alignment="center")
+    metric_col, spacer_col, selector_col, delete_col = st.columns(
+        [1.1, 1.2, 2.5, 0.7], vertical_alignment="bottom"
+    )
+    with metric_col:
+        render_metric_card("历史画像", str(len(tasks)), "持续保留，可随时重新生成")
+    with spacer_col:
+        st.empty()
     with selector_col:
         selected = st.selectbox(
-            "历史画像任务",
+            "我的画像任务",
             options=options,
-            format_func=lambda value: "＋  创建新画像" if not value else labels[value],
-            label_visibility="collapsed",
+            format_func=lambda value: "＋ 创建新画像" if not value else labels[value],
             key=PROFILE_SELECTOR_KEY,
         )
     with delete_col:
         delete_clicked = st.button(
             "删除",
-            key="sidebar-delete-profile",
+            key="page-delete-profile",
             disabled=not selected,
             help="删除当前画像；处理中任务会立即取消",
             use_container_width=True,
@@ -374,7 +378,7 @@ def render_profile_workspace(client: ProfileClient) -> None:
     if selected:
         render_task(client, selected)
     else:
-        render_upload(client, tasks)
+        render_upload(client)
 
 
 def render_match_workspace(profile_client: ProfileClient, match_client: MatchClient) -> None:
@@ -1095,24 +1099,8 @@ def render_sidebar_stats(total: int, completed: int, active: int) -> None:
     )
 
 
-def render_upload(client: ProfileClient, tasks: list[dict]) -> None:
-    render_page_header(
-        "Profile Builder",
-        "把零散资料整理成清晰的六维画像",
-        "上传 Word、PDF、Markdown 或 PowerPoint。Agent 会解析证据、聚合同一经历，并生成六份可追溯画像文档。",
-    )
-    render_metric_row(
-        [
-            ("历史画像", str(len(tasks)), "持续保留，可随时重新生成"),
-            ("支持格式", "6 种", "DOC · DOCX · PDF · MD · PPT · PPTX"),
-            ("画像维度", "6 个", "个人、专业、项目、比赛、实习、学校"),
-            ("素材审计", "开启", "证据、来源与敏感属性检查"),
-        ]
-    )
-    render_section_heading("创建画像", "一次可上传多份资料；建议同时上传简历、项目材料和作品说明。")
+def render_upload(client: ProfileClient) -> None:
     with st.container(border=True):
-        st.markdown("#### 新建资料画像")
-        st.caption("文件只用于本地解析与画像生成，可在任务完成后彻底删除。")
         with st.form("upload-form"):
             title = st.text_input("任务名称", placeholder="例如：2026 春招完整画像")
             files = st.file_uploader(
@@ -1121,12 +1109,9 @@ def render_upload(client: ProfileClient, tasks: list[dict]) -> None:
                 accept_multiple_files=True,
                 help="最多 20 个文件，单文件默认不超过 50 MB。",
             )
-            option_col, action_col = st.columns([2, 1], vertical_alignment="bottom")
-            with option_col:
-                review = st.toggle(
-                    "生成前核对事实",
-                    help="开启后，Agent 会在生成画像前暂停，等待你修改或确认事实。",
-                )
+            spacer_col, action_col = st.columns([2, 1], vertical_alignment="bottom")
+            with spacer_col:
+                st.empty()
             with action_col:
                 submitted = st.form_submit_button(
                     "开始整理资料",
@@ -1137,14 +1122,13 @@ def render_upload(client: ProfileClient, tasks: list[dict]) -> None:
             if not files:
                 st.warning("请先上传至少一份资料。")
                 return
-            fingerprint = profile_submission_fingerprint(title, review, files)
+            fingerprint = profile_submission_fingerprint(title, files)
             if is_duplicate_submission("profile", fingerprint):
                 st.toast("该画像任务刚刚已保存，请勿重复点击。", icon="ℹ️")
                 return
             try:
                 response = client.create_profile(
                     files,
-                    review_mode="pause" if review else "auto",
                     title=title,
                 )
                 remember_submission("profile", fingerprint)
@@ -1161,11 +1145,6 @@ def render_task(client: ProfileClient, task_id: str) -> None:
     except ProfileClientError as exc:
         st.error(str(exc))
         return
-    render_page_header(
-        "Profile Task",
-        task["title"],
-        "查看解析进度、核对事实并管理六维画像结果。",
-    )
     render_task_banner(task, "资料画像任务")
     control_col, progress_col = st.columns([1, 4], vertical_alignment="center")
     with control_col:
@@ -1177,23 +1156,10 @@ def render_task(client: ProfileClient, task_id: str) -> None:
         )
     if task.get("error") and "未解决冲突" not in task["error"]:
         st.warning(task["error"])
-    with st.expander(f"已上传文件 · {len(task['documents'])} 份"):
-        st.dataframe(
-            task["documents"],
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "original_name": "文件名",
-                "status": "状态",
-                "page_count": "页数",
-                "error": "错误",
-            },
-        )
+    render_profile_pool(task)
 
     status = task["status"]
-    if status == "awaiting_review":
-        render_fact_review(client, task_id)
-    elif status in {"completed", "partial_success"}:
+    if status in {"completed", "partial_success"}:
         render_result(client, task_id)
     elif status in {"failed", "failed_retryable"}:
         with st.container(border=True):
@@ -1212,51 +1178,35 @@ def render_task(client: ProfileClient, task_id: str) -> None:
     )
 
 
-def render_fact_review(client: ProfileClient, task_id: str) -> None:
-    render_section_heading("事实核对", "调整事实文本、分类、置信度或状态，证据引用会被完整保留。")
-    payload = client.get_facts(task_id)
-    facts = payload["facts"]
+def render_profile_pool(task: dict) -> None:
+    documents = task.get("documents", [])
+    st.markdown("### 画像池")
+    st.caption(f"当前任务共保存 {len(documents)} 份资料，文件状态会随解析进度更新。")
+    if not documents:
+        render_empty("当前任务暂时没有可显示的资料文件。")
+        return
     rows = [
         {
-            "id": fact["id"],
-            "category": fact["category"],
-            "statement": fact["statement"],
-            "confidence": fact["confidence"],
-            "status": fact["status"],
+            "文件名": document.get("original_name", ""),
+            "格式": (document.get("extension") or "").replace(".", "").upper(),
+            "大小": format_file_size(document.get("size_bytes", 0)),
+            "状态": document_status_label(document.get("status", "")),
+            "错误": document.get("error") or "",
         }
-        for fact in facts
+        for document in documents
     ]
-    with st.container(border=True):
-        edited = st.data_editor(
-            rows,
-            use_container_width=True,
-            num_rows="fixed",
-            hide_index=True,
-            column_config={
-                "id": None,
-                "category": "画像维度",
-                "statement": st.column_config.TextColumn("事实内容", width="large"),
-                "confidence": st.column_config.ProgressColumn(
-                    "置信度", min_value=0.0, max_value=1.0, format="%.0f%%"
-                ),
-                "status": "状态",
-            },
-        )
-        st.info("同一经历的不同名称、职责、技术和成果表达会自动聚合为互补素材。")
-        save_col, generate_col = st.columns(2)
-        if save_col.button("保存事实修改", use_container_width=True):
-            by_id = {fact["id"]: fact for fact in facts}
-            updated = []
-            for row in edited:
-                fact = by_id[row["id"]]
-                fact.update(row)
-                updated.append(fact)
-            client.update_facts(task_id, updated)
-            st.toast("事实修改已保存。", icon="✅")
-        if generate_col.button("确认事实并生成画像", type="primary", use_container_width=True):
-            client.resume(task_id)
-            set_flash("事实确认已保存，画像生成已开始。")
-            st.rerun()
+    st.dataframe(
+        rows,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "文件名": st.column_config.TextColumn(width="large"),
+            "格式": st.column_config.TextColumn(width="small"),
+            "大小": st.column_config.TextColumn(width="small"),
+            "状态": st.column_config.TextColumn(width="small"),
+            "错误": st.column_config.TextColumn(width="medium"),
+        },
+    )
 
 
 def render_result(client: ProfileClient, task_id: str) -> None:
@@ -1746,16 +1696,21 @@ def render_page_header(eyebrow: str, title: str, subtitle: str) -> None:
 def render_metric_row(items: list[tuple[str, str, str]]) -> None:
     columns = st.columns(len(items))
     for column, (label, value, note) in zip(columns, items, strict=True):
-        column.markdown(
-            f"""
-            <div class="metric-card">
-                <div class="metric-label">{html.escape(label)}</div>
-                <div class="metric-value">{html.escape(value)}</div>
-                <div class="metric-note">{html.escape(note)}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        with column:
+            render_metric_card(label, value, note)
+
+
+def render_metric_card(label: str, value: str, note: str) -> None:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">{html.escape(label)}</div>
+            <div class="metric-value">{html.escape(value)}</div>
+            <div class="metric-note">{html.escape(note)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_section_heading(title: str, subtitle: str) -> None:
@@ -1873,9 +1828,9 @@ def delete_match_task(client: MatchClient, match_id: str) -> None:
     st.rerun()
 
 
-def profile_submission_fingerprint(title: str, review: bool, files) -> str:
+def profile_submission_fingerprint(title: str, files) -> str:
     digest = hashlib.sha256()
-    update_digest(digest, title.strip(), "pause" if review else "auto")
+    update_digest(digest, title.strip(), "auto")
     for file in files:
         update_digest(digest, file.name, str(getattr(file, "size", "")))
         digest.update(file.getbuffer())
@@ -1939,6 +1894,24 @@ def stage_label(stage: str) -> str:
         "failed": "处理失败",
     }
     return labels.get(stage, stage.replace("_", " "))
+
+
+def document_status_label(status: str) -> str:
+    return {
+        "stored": "等待解析",
+        "parsing": "解析中",
+        "parsed": "已解析",
+        "failed": "失败",
+    }.get(status, status or "未知")
+
+
+def format_file_size(size_bytes: int) -> str:
+    size = float(size_bytes or 0)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024 or unit == "GB":
+            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024
+    return "0 B"
 
 
 def format_time(value: str | None, short: bool = False) -> str:
