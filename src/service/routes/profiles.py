@@ -1,11 +1,16 @@
 from pathlib import Path
-from profile.models import ConflictRecord
+from profile.exporters.docx import export_docx
+from profile.exporters.markdown import export_markdown
+from profile.models import FactCategory
+from profile.section_documents import SECTION_FILENAMES, write_profile_section_documents
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
 from ingestion.validation import FileValidationError, validate_file
+from jobs.application_runner import ApplicationRunner
+from jobs.match_runner import MatchJobRunner
 from jobs.runner import JobAction, JobRunner
 from schema.profile_api import (
     DeleteResponse,
@@ -21,11 +26,15 @@ from schema.profile_api import (
     TaskSummary,
 )
 from service.dependencies import (
+    get_application_runner,
+    get_career_repository,
     get_job_runner,
+    get_match_job_runner,
     get_match_repository,
     get_repository,
     get_storage,
 )
+from storage.career_repositories import CareerRepository
 from storage.files import FileStorage
 from storage.repositories import MatchRepository, ProfileRepository
 
@@ -135,7 +144,7 @@ def get_profile_task(
             )
             for document in task.documents
         ],
-        conflicts=[ConflictRecord.model_validate(item) for item in task.conflicts],
+        conflicts=[],
     )
 
 
@@ -226,6 +235,34 @@ def get_result(
     return ResultResponse(result=result)
 
 
+@router.get("/{task_id}/sections/{section_name}")
+def export_profile_section(
+    task_id: str,
+    section_name: str,
+    repository: ProfileRepository = Depends(get_repository),
+    storage: FileStorage = Depends(get_storage),
+):
+    _require_task(repository, task_id)
+    try:
+        category = FactCategory(section_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="画像维度不存在。") from exc
+    result = repository.get_result(task_id)
+    if result is None:
+        raise HTTPException(status_code=409, detail="画像尚未生成。")
+    paths = write_profile_section_documents(
+        result,
+        repository.get_facts(task_id),
+        storage.profile_sections_dir(task_id),
+    )
+    path = paths[category.value]
+    return FileResponse(
+        path,
+        media_type="text/markdown",
+        filename=SECTION_FILENAMES[category.value],
+    )
+
+
 @router.get("/{task_id}/export")
 def export_result(
     task_id: str,
@@ -233,10 +270,15 @@ def export_result(
     repository: ProfileRepository = Depends(get_repository),
 ):
     _require_task(repository, task_id)
+    result = repository.get_result(task_id)
+    if result is None:
+        raise HTTPException(status_code=409, detail="画像尚未生成。")
     markdown_path, docx_path = repository.get_result_paths(task_id)
     if format == "md" and markdown_path:
+        export_markdown(result, Path(markdown_path))
         return FileResponse(markdown_path, media_type="text/markdown", filename="profile.md")
     if format == "docx" and docx_path:
+        export_docx(result, Path(docx_path))
         return FileResponse(
             docx_path,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -246,17 +288,34 @@ def export_result(
 
 
 @router.delete("/{task_id}", response_model=DeleteResponse)
-def delete_profile(
+async def delete_profile(
     task_id: str,
     repository: ProfileRepository = Depends(get_repository),
     match_repository: MatchRepository = Depends(get_match_repository),
     storage: FileStorage = Depends(get_storage),
+    runner: JobRunner = Depends(get_job_runner),
+    match_runner: MatchJobRunner = Depends(get_match_job_runner),
+    career_repository: CareerRepository = Depends(get_career_repository),
+    application_runner: ApplicationRunner = Depends(get_application_runner),
 ) -> DeleteResponse:
-    task = _require_task(repository, task_id)
-    if task.status in ACTIVE_STATUSES:
-        raise HTTPException(status_code=409, detail="任务处理中，暂不能删除。")
-    for match_id in match_repository.list_ids_for_profile(task_id):
+    _require_task(repository, task_id)
+    await runner.cancel(task_id)
+    match_ids = match_repository.list_ids_for_profile(task_id)
+    for match_id in match_ids:
+        await match_runner.cancel(match_id)
         storage.delete_match_files(match_id)
+    jobs = career_repository.list_jobs(profile_task_id=task_id)
+    job_ids = {job.id for job in jobs}
+    for application in career_repository.list_applications():
+        if application.job_id in job_ids:
+            await application_runner.cancel(application.id)
+            storage.delete_application_files(application.id)
+    for job in jobs:
+        for kit in career_repository.list_interview_kits(job.id):
+            storage.delete_interview_files(kit.id)
+        storage.delete_job_files(job.id)
+    for campaign in career_repository.list_campaigns(task_id):
+        storage.delete_campaign_files(campaign.id)
     storage.delete_task_files(task_id)
     repository.delete_task(task_id)
     return DeleteResponse()

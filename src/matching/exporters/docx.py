@@ -21,6 +21,19 @@ def export_match_docx(result: JDMatchResult, path: Path) -> Path:
     document.styles["Normal"].font.size = Pt(10.5)
     document.add_heading(f"{result.jd_analysis.role_title} · JD 匹配文案", level=0)
     document.add_paragraph(f"总匹配度：{result.overall_score:.1f}｜版本：v{result.version}")
+    document.add_heading("岗位说明", level=1)
+    document.add_paragraph(result.job_research.role_summary)
+    document.add_paragraph(
+        f"核心能力：{'、'.join(result.job_research.core_capabilities) or '未识别'}"
+    )
+    document.add_paragraph(
+        f"常见职责：{'；'.join(result.job_research.typical_responsibilities) or '未识别'}"
+    )
+    document.add_paragraph(f"常见工具：{'、'.join(result.job_research.common_tools) or '未识别'}")
+    if result.job_research.sources:
+        document.add_heading("岗位研究来源", level=2)
+        for source in result.job_research.sources:
+            document.add_paragraph(f"{source.title}：{source.url}", style="List Bullet")
     document.add_heading("匹配分析", level=1)
     for item in result.strengths:
         document.add_paragraph(f"优势：{item}", style="List Bullet")
@@ -38,6 +51,29 @@ def export_match_docx(result: JDMatchResult, path: Path) -> Path:
                 name = getattr(entry, "name", None) or getattr(entry, "institution", "")
                 document.add_heading(name, level=2)
                 document.add_paragraph(entry.tailored_summary.content)
+                if hasattr(entry, "organization"):
+                    document.add_paragraph(
+                        "｜".join(
+                            [
+                                entry.organization or "资料未提供",
+                                entry.period or "资料未提供",
+                                entry.role or "资料未提供",
+                            ]
+                        )
+                    )
+                    document.add_paragraph(
+                        f"核心技术：{'、'.join(entry.technologies) or '资料未提供'}"
+                    )
+                else:
+                    document.add_paragraph(
+                        "｜".join(
+                            [
+                                entry.degree or "资料未提供",
+                                entry.major or "资料未提供",
+                                entry.period or "资料未提供",
+                            ]
+                        )
+                    )
                 for unit in entry.bullets:
                     document.add_paragraph(unit.content, style="List Bullet")
     document.add_heading("质量审计", level=1)

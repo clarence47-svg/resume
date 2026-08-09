@@ -54,6 +54,11 @@ class ProfileFact(BaseModel):
     status: FactStatus = FactStatus.EXTRACTED
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @property
+    def material_group_id(self) -> str | None:
+        value = self.metadata.get("material_group_id")
+        return str(value) if value else None
+
 
 class ConflictRecord(BaseModel):
     field: str
@@ -99,6 +104,7 @@ class ExperienceEntry(BaseModel):
     technologies: list[str] = Field(default_factory=list)
     outcomes: list[ProfileClaim] = Field(default_factory=list)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    source_fact_ids: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.8, ge=0, le=1)
     attributes: dict[str, str] = Field(default_factory=dict)
 
@@ -119,6 +125,7 @@ class EducationEntry(BaseModel):
     honors: list[ProfileClaim] = Field(default_factory=list)
     campus_experiences: list[ProfileClaim] = Field(default_factory=list)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    source_fact_ids: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.8, ge=0, le=1)
 
 

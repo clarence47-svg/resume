@@ -1,12 +1,13 @@
 [project]
 name = "profile-agent-service"
-version = "0.1.0"
-description = "A LangGraph service that builds evidence-backed six-dimension user profiles from uploaded documents."
+version = "0.3.0"
+description = "An evidence-backed LangGraph service for profiles, job matching, resumes, and safe applications."
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
 dependencies = [
     "alembic>=1.14,<2",
     "charset-normalizer>=3.4,<4",
+    "cryptography>=44,<46",
     "docling>=2.30,<3",
     "fastapi>=0.115,<1",
     "filetype>=1.2,<2",
@@ -21,6 +22,7 @@ dependencies = [
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
     "pymupdf>=1.25,<2",
+    "playwright>=1.52,<2",
     "python-docx>=1.1,<2",
     "python-multipart>=0.0.20,<1",
     "python-pptx>=1.0,<2",
@@ -59,16 +61,23 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = [
     "src/agents",
+    "src/applications",
+    "src/campaigns",
+    "src/career",
     "src/client",
     "src/core",
     "src/ingestion",
+    "src/interview",
+    "src/job_search",
     "src/jobs",
     "src/memory",
     "src/matching",
     "src/profile",
+    "src/resumes",
     "src/schema",
     "src/service",
     "src/storage",
+    "src/tracking",
 ]
 
 [[tool.uv.index]]

@@ -9,7 +9,10 @@ class JDMatchAgentState(TypedDict, total=False):
     profile_result: dict[str, Any]
     facts: list[dict[str, Any]]
     conflicts: list[dict[str, Any]]
+    profile_sections: dict[str, str]
+    tailored_profile_sections: dict[str, str]
     jd_analysis: dict[str, Any]
+    job_research: dict[str, Any]
     requirement_matches: list[dict[str, Any]]
     overall_score: float
     dimension_scores: dict[str, Any]
@@ -27,4 +30,4 @@ class JDMatchAgentState(TypedDict, total=False):
     warnings: Annotated[list[str], operator.add]
     export_dir: str
     target_version: int
-    export_paths: dict[str, str]
+    export_paths: dict[str, Any]

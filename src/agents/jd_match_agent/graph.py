@@ -8,6 +8,7 @@ from agents.jd_match_agent.nodes.jd_analysis import analyze_jd
 from agents.jd_match_agent.nodes.matching import match_requirements
 from agents.jd_match_agent.nodes.persist import persist_and_export
 from agents.jd_match_agent.nodes.preparation import prepare
+from agents.jd_match_agent.nodes.research import research_role
 from agents.jd_match_agent.nodes.scoring import score_and_select
 from agents.jd_match_agent.state import JDMatchAgentState
 
@@ -17,7 +18,9 @@ def route_sections(state: JDMatchAgentState):
         key: state.get(key)
         for key in (
             "facts",
+            "tailored_profile_sections",
             "jd_analysis",
+            "job_research",
             "requirement_matches",
             "selected_entries",
             "selected_fact_ids",
@@ -37,6 +40,7 @@ def build_graph(checkpointer=None):
     builder = StateGraph(JDMatchAgentState)
     builder.add_node("prepare", prepare)
     builder.add_node("analyze_jd", analyze_jd)
+    builder.add_node("research_role", research_role)
     builder.add_node("match_requirements", match_requirements)
     builder.add_node("score_and_select", score_and_select)
     builder.add_node("generate_section", generate_section)
@@ -46,7 +50,8 @@ def build_graph(checkpointer=None):
     builder.add_node("persist_and_export", persist_and_export)
     builder.add_edge(START, "prepare")
     builder.add_edge("prepare", "analyze_jd")
-    builder.add_edge("analyze_jd", "match_requirements")
+    builder.add_edge("analyze_jd", "research_role")
+    builder.add_edge("research_role", "match_requirements")
     builder.add_edge("match_requirements", "score_and_select")
     builder.add_conditional_edges("score_and_select", route_sections)
     builder.add_edge("generate_section", "assemble")

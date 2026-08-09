@@ -46,11 +46,6 @@ def export_docx(result: ProfileResult, path: Path) -> Path:
         document.add_paragraph(f"时间：{entry.period or '资料未提供'}")
         _add_claims(document, entry.honors + entry.campus_experiences)
 
-    if result.conflicts:
-        document.add_heading("待核对冲突", level=1)
-        for conflict in result.conflicts:
-            document.add_paragraph(conflict.description, style="List Bullet")
-
     document.add_heading("质量审计", level=1)
     document.add_paragraph(f"引用覆盖率：{result.audit.citation_coverage:.0%}")
     for warning in result.audit.warnings:

@@ -91,23 +91,38 @@ def _heuristic_section(section_name: str, facts: list[ProfileFact]) -> SectionDr
             for fact in facts[:12]
         ]
         return SectionDraft(overview=overview, claims=claims)
-    entries = [
-        EntryDraft(
-            name=fact.statement[:40],
-            summary=fact.statement,
-            details=[
-                ClaimDraft(
-                    content=fact.statement,
-                    basis_type=fact.basis_type,
-                    confidence=fact.confidence,
-                    fact_ids=[fact.id],
-                    rationale=fact.rationale,
-                )
-            ],
-            fact_ids=[fact.id],
+    grouped: defaultdict[str, list[ProfileFact]] = defaultdict(list)
+    for fact in facts:
+        grouped[fact.material_group_id or fact.id].append(fact)
+    entries = []
+    for group_facts in list(grouped.values())[:20]:
+        fact_ids = [fact.id for fact in group_facts]
+        name = str(
+            group_facts[0].metadata.get("canonical_name")
+            or group_facts[0].metadata.get("experience_name")
+            or group_facts[0].statement[:40]
         )
-        for fact in facts[:20]
-    ]
+        entries.append(
+            EntryDraft(
+                name=name,
+                organization=_first_metadata(group_facts, "organization"),
+                period=_first_metadata(group_facts, "period"),
+                role=_first_metadata(group_facts, "role"),
+                summary="；".join(fact.statement for fact in group_facts)[:1000],
+                details=[
+                    ClaimDraft(
+                        content=fact.statement,
+                        basis_type=fact.basis_type,
+                        confidence=fact.confidence,
+                        fact_ids=[fact.id],
+                        rationale=fact.rationale,
+                    )
+                    for fact in group_facts
+                ],
+                attributes={"material_group_id": group_facts[0].material_group_id or ""},
+                fact_ids=fact_ids,
+            )
+        )
     return SectionDraft(overview=overview, entries=entries)
 
 
@@ -136,9 +151,18 @@ def _materialize_section(section_name: str, draft: SectionDraft, facts: list[Pro
         )
     if section_name == FactCategory.EDUCATION.value:
         entries = []
+        seen_groups: set[str] = set()
         for entry in draft.entries:
-            evidence = _entry_evidence(entry, fact_map)
-            grouped = _group_claims(entry.details + entry.outcomes, fact_map)
+            entry_fact_ids = _expanded_entry_fact_ids(entry, fact_map)
+            group_key = _entry_group_key(entry_fact_ids, fact_map)
+            if group_key in seen_groups:
+                continue
+            seen_groups.add(group_key)
+            evidence = _fact_ids_evidence(entry_fact_ids, fact_map)
+            complete_claims = _complete_entry_claims(
+                entry.details + entry.outcomes, entry_fact_ids, fact_map
+            )
+            grouped = _group_claims(complete_claims, fact_map)
             entries.append(
                 EducationEntry(
                     institution=entry.name,
@@ -150,6 +174,7 @@ def _materialize_section(section_name: str, draft: SectionDraft, facts: list[Pro
                     honors=grouped["honor"] + grouped["outcome"],
                     campus_experiences=grouped["detail"],
                     evidence_refs=evidence,
+                    source_fact_ids=entry_fact_ids,
                     confidence=_entry_confidence(entry, fact_map),
                 )
             )
@@ -159,9 +184,29 @@ def _materialize_section(section_name: str, draft: SectionDraft, facts: list[Pro
             entries=entries,
         )
     entries = []
+    seen_groups: set[str] = set()
     for entry in draft.entries:
-        grouped = _group_claims(entry.details, fact_map)
+        entry_fact_ids = _expanded_entry_fact_ids(entry, fact_map)
+        group_key = _entry_group_key(entry_fact_ids, fact_map)
+        if group_key in seen_groups:
+            continue
+        seen_groups.add(group_key)
+        complete_details = _complete_entry_claims(
+            entry.details,
+            entry_fact_ids,
+            fact_map,
+            represented_drafts=entry.details + entry.outcomes,
+        )
+        grouped = _group_claims(complete_details, fact_map)
         outcomes = [_claim(item, fact_map) for item in entry.outcomes]
+        group_ids = {
+            fact_map[fact_id].material_group_id
+            for fact_id in entry_fact_ids
+            if fact_id in fact_map and fact_map[fact_id].material_group_id
+        }
+        attributes = dict(entry.attributes)
+        if len(group_ids) == 1:
+            attributes["material_group_id"] = next(iter(group_ids))
         entries.append(
             ExperienceEntry(
                 name=entry.name,
@@ -172,9 +217,10 @@ def _materialize_section(section_name: str, draft: SectionDraft, facts: list[Pro
                 details=[claim for claims in grouped.values() for claim in claims],
                 technologies=entry.technologies,
                 outcomes=outcomes,
-                evidence_refs=_entry_evidence(entry, fact_map),
+                evidence_refs=_fact_ids_evidence(entry_fact_ids, fact_map),
+                source_fact_ids=entry_fact_ids,
                 confidence=_entry_confidence(entry, fact_map),
-                attributes=entry.attributes,
+                attributes=attributes,
             )
         )
     return ExperienceSection(
@@ -208,10 +254,23 @@ def _claim(draft: ClaimDraft, fact_map: dict[str, ProfileFact]) -> ProfileClaim:
     )
 
 
-def _entry_evidence(entry: EntryDraft, fact_map: dict[str, ProfileFact]):
+def _expanded_entry_fact_ids(entry: EntryDraft, fact_map: dict[str, ProfileFact]) -> list[str]:
     fact_ids = set(entry.fact_ids)
     for claim in entry.details + entry.outcomes:
         fact_ids.update(claim.fact_ids)
+    group_ids = {
+        fact_map[fact_id].material_group_id
+        for fact_id in fact_ids
+        if fact_id in fact_map and fact_map[fact_id].material_group_id
+    }
+    if group_ids:
+        fact_ids.update(
+            fact.id for fact in fact_map.values() if fact.material_group_id in group_ids
+        )
+    return [fact_id for fact_id in fact_map if fact_id in fact_ids]
+
+
+def _fact_ids_evidence(fact_ids: list[str], fact_map: dict[str, ProfileFact]):
     evidence = {
         item.span_id: item
         for fact_id in fact_ids
@@ -219,6 +278,40 @@ def _entry_evidence(entry: EntryDraft, fact_map: dict[str, ProfileFact]):
         for item in fact_map[fact_id].evidence_refs
     }
     return list(evidence.values())
+
+
+def _complete_entry_claims(
+    drafts: list[ClaimDraft],
+    fact_ids: list[str],
+    fact_map: dict[str, ProfileFact],
+    represented_drafts: list[ClaimDraft] | None = None,
+) -> list[ClaimDraft]:
+    represented = {fact_id for draft in represented_drafts or drafts for fact_id in draft.fact_ids}
+    output = list(drafts)
+    for fact_id in fact_ids:
+        if fact_id in represented or fact_id not in fact_map:
+            continue
+        fact = fact_map[fact_id]
+        output.append(
+            ClaimDraft(
+                group="detail",
+                content=fact.statement,
+                basis_type=fact.basis_type,
+                confidence=fact.confidence,
+                fact_ids=[fact.id],
+                rationale=fact.rationale,
+            )
+        )
+    return output
+
+
+def _entry_group_key(fact_ids: list[str], fact_map: dict[str, ProfileFact]) -> str:
+    groups = [
+        fact_map[fact_id].material_group_id
+        for fact_id in fact_ids
+        if fact_id in fact_map and fact_map[fact_id].material_group_id
+    ]
+    return groups[0] if groups else ":".join(sorted(fact_ids))
 
 
 def _entry_confidence(entry: EntryDraft, fact_map: dict[str, ProfileFact]) -> float:
@@ -230,3 +323,11 @@ def _split_attribute(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.replace("，", ",").split(",") if item.strip()]
+
+
+def _first_metadata(facts: list[ProfileFact], key: str) -> str | None:
+    for fact in facts:
+        value = fact.metadata.get(key)
+        if value:
+            return str(value)
+    return None

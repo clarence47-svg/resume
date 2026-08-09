@@ -19,6 +19,18 @@ class SupportLevel(StrEnum):
     NONE = "none"
 
 
+class RequirementOrigin(StrEnum):
+    JD = "jd"
+    MARKET_RESEARCH = "market_research"
+
+
+class ResearchStatus(StrEnum):
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    UNAVAILABLE = "unavailable"
+    DISABLED = "disabled"
+
+
 class MatchVersionSource(StrEnum):
     GENERATED = "generated"
     USER_EDIT = "user_edit"
@@ -33,6 +45,27 @@ class JDRequirement(BaseModel):
     priority: RequirementPriority
     weight: float = Field(gt=0)
     keywords: list[str] = Field(default_factory=list)
+    origin: RequirementOrigin = RequirementOrigin.JD
+    source_urls: list[str] = Field(default_factory=list)
+
+
+class JobResearchSource(BaseModel):
+    title: str
+    url: str
+    snippet: str = ""
+    query: str = ""
+
+
+class JobResearch(BaseModel):
+    role_title: str = "目标岗位"
+    role_summary: str = "未获得岗位市场研究信息。"
+    core_capabilities: list[str] = Field(default_factory=list)
+    typical_responsibilities: list[str] = Field(default_factory=list)
+    common_tools: list[str] = Field(default_factory=list)
+    market_keywords: list[str] = Field(default_factory=list)
+    search_queries: list[str] = Field(default_factory=list)
+    sources: list[JobResearchSource] = Field(default_factory=list)
+    status: ResearchStatus = ResearchStatus.UNAVAILABLE
 
 
 class JDAnalysis(BaseModel):
@@ -90,6 +123,7 @@ class TailoredExperienceEntry(BaseModel):
     organization: str | None = None
     period: str | None = None
     role: str | None = None
+    technologies: list[str] = Field(default_factory=list)
     tailored_summary: TailoredCopyUnit
     bullets: list[TailoredCopyUnit] = Field(default_factory=list)
     selected_reason: str = ""
@@ -141,12 +175,14 @@ class JDMatchResult(JDMatchCopy):
     match_id: str
     profile_task_id: str
     jd_analysis: JDAnalysis
+    job_research: JobResearch = Field(default_factory=JobResearch)
     requirement_matches: list[RequirementMatch] = Field(default_factory=list)
     overall_score: float = Field(default=0, ge=0, le=100)
     dimension_scores: dict[FactCategory, DimensionMatch] = Field(default_factory=dict)
     keyword_coverage: KeywordCoverage = Field(default_factory=KeywordCoverage)
     strengths: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
+    section_documents: dict[str, str] = Field(default_factory=dict)
     audit: MatchAudit = Field(default_factory=MatchAudit)
     model: str = ""
     version: int = Field(default=1, ge=1)

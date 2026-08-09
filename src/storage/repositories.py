@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from profile.models import ConflictRecord, EvidenceRef, ProfileFact, ProfileResult
+from profile.section_documents import SECTION_SNAPSHOT_KEY
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, selectinload, sessionmaker
@@ -167,16 +168,10 @@ class ProfileRepository:
         ]
 
     def set_conflicts(self, task_id: str, conflicts: list[ConflictRecord]) -> None:
-        self.update_task(
-            task_id,
-            conflicts=[conflict.model_dump(mode="json") for conflict in conflicts],
-        )
+        self.update_task(task_id, conflicts=[])
 
     def get_conflicts(self, task_id: str) -> list[ConflictRecord]:
-        task = self.get_task(task_id)
-        if task is None:
-            return []
-        return [ConflictRecord.model_validate(item) for item in task.conflicts]
+        return []
 
     def save_result(
         self, task_id: str, result: ProfileResult, markdown_path: str, docx_path: str
@@ -193,7 +188,11 @@ class ProfileRepository:
     def get_result(self, task_id: str) -> ProfileResult | None:
         with self.session_factory() as session:
             row = session.get(ProfileResultORM, task_id)
-            return ProfileResult.model_validate(row.result_json) if row else None
+            if row is None:
+                return None
+            result = ProfileResult.model_validate(row.result_json)
+            result.conflicts = []
+            return result
 
     def get_result_paths(self, task_id: str) -> tuple[str | None, str | None]:
         with self.session_factory() as session:
@@ -221,16 +220,23 @@ class MatchRepository:
         title: str,
         jd_text: str,
         profile_result: ProfileResult,
+        profile_sections: dict[str, str],
         facts: list[ProfileFact],
         conflicts: list[ConflictRecord],
+        job_id: str | None = None,
+        batch_id: str | None = None,
     ) -> MatchTaskORM:
         with self.session_factory.begin() as session:
+            profile_snapshot = profile_result.model_dump(mode="json")
+            profile_snapshot[SECTION_SNAPSHOT_KEY] = profile_sections
             task = MatchTaskORM(
                 id=match_id,
                 profile_task_id=profile_task_id,
+                job_id=job_id,
+                batch_id=batch_id,
                 title=title,
                 jd_text=jd_text,
-                profile_result_snapshot=profile_result.model_dump(mode="json"),
+                profile_result_snapshot=profile_snapshot,
                 facts_snapshot=[fact.model_dump(mode="json") for fact in facts],
                 conflicts_snapshot=[item.model_dump(mode="json") for item in conflicts],
                 status="queued",

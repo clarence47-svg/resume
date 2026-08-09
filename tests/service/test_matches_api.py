@@ -124,3 +124,24 @@ def test_deleting_profile_cascades_match(test_settings) -> None:
         response = client.delete(f"/profiles/{profile_id}")
         assert response.status_code == 200
         assert client.get(f"/matches/{match_id}").status_code == 404
+
+
+def test_match_can_be_deleted_immediately_after_creation(test_settings) -> None:
+    app = create_app(test_settings)
+    with TestClient(app) as client:
+        profile_id = _create_profile(client)
+        response = client.post(
+            "/matches",
+            json={
+                "profile_task_id": profile_id,
+                "title": "立即删除匹配",
+                "jd_text": "后端工程师\n任职要求：熟悉 Python 和 FastAPI。",
+            },
+        )
+        assert response.status_code == 202, response.text
+        match_id = response.json()["match_id"]
+
+        deleted = client.delete(f"/matches/{match_id}")
+
+        assert deleted.status_code == 200, deleted.text
+        assert client.get(f"/matches/{match_id}").status_code == 404

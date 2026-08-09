@@ -9,6 +9,8 @@ EXTRACTION_SYSTEM_PROMPT = """
 4. 事实默认 basis_type=fact；只有职业特点或能力倾向等合理归纳才可标记 inference。
 5. 推断必须有明确证据并给出简短依据，不得推断健康、政治、宗教、民族等敏感属性。
 6. 一条记录只表达一个事实，尽量保留量化成果和时间信息。
+7. 项目、比赛、实习和学校经历尽量填写 experience_name、organization、period、role。
+8. 即使材料为了不同岗位改写了经历名称，也要保留原文名称，不要擅自统一或删除信息。
 """.strip()
 
 

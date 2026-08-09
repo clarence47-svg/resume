@@ -1,13 +1,20 @@
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy
 
-RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
-        libreoffice libmagic1 fonts-noto-cjk \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    for attempt in 1 2 3; do \
+        apt-get -o Acquire::Retries=5 update \
+        && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
+            libreoffice-core libreoffice-writer libreoffice-impress \
+            libmagic1 fonts-wqy-zenhei \
+        && rm -rf /var/lib/apt/lists/* \
+        && exit 0; \
+        sleep 5; \
+    done; \
+    exit 1
 
 WORKDIR /app
 RUN pip install --no-cache-dir uv

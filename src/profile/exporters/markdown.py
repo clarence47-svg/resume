@@ -26,10 +26,6 @@ def export_markdown(result: ProfileResult, path: Path) -> Path:
             ]
         )
         lines.extend(_claims(entry.honors + entry.campus_experiences))
-    if result.conflicts:
-        lines.extend(["## 待核对冲突", ""])
-        lines.extend(f"- {item.description}" for item in result.conflicts)
-        lines.append("")
     lines.extend(["## 质量审计", "", f"- 引用覆盖率：{result.audit.citation_coverage:.0%}"])
     lines.extend(f"- {warning}" for warning in result.audit.warnings)
     path.parent.mkdir(parents=True, exist_ok=True)

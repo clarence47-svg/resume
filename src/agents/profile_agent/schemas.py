@@ -12,10 +12,23 @@ class ExtractedFactDraft(BaseModel):
     evidence_span_ids: list[str] = Field(default_factory=list)
     rationale: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
+    experience_name: str | None = None
+    organization: str | None = None
+    period: str | None = None
+    role: str | None = None
 
 
 class FactExtractionResponse(BaseModel):
     facts: list[ExtractedFactDraft] = Field(default_factory=list)
+
+
+class MaterialGroupDraft(BaseModel):
+    canonical_name: str = ""
+    fact_ids: list[str] = Field(default_factory=list)
+
+
+class MaterialGroupingResponse(BaseModel):
+    groups: list[MaterialGroupDraft] = Field(default_factory=list)
 
 
 class ClaimDraft(BaseModel):

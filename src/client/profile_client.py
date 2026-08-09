@@ -63,6 +63,9 @@ class ProfileClient:
             "GET", f"/profiles/{task_id}/export", params={"format": format}
         ).content
 
+    def download_section(self, task_id: str, section_name: str) -> bytes:
+        return self._request("GET", f"/profiles/{task_id}/sections/{section_name}").content
+
     def delete(self, task_id: str) -> dict:
         return self._request("DELETE", f"/profiles/{task_id}").json()
 

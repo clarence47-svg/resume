@@ -81,7 +81,19 @@ def _materialize_facts(
                 confidence=draft.confidence,
                 evidence_refs=evidence,
                 rationale=draft.rationale,
-                metadata=draft.metadata,
+                metadata={
+                    **draft.metadata,
+                    **{
+                        key: value
+                        for key, value in {
+                            "experience_name": draft.experience_name,
+                            "organization": draft.organization,
+                            "period": draft.period,
+                            "role": draft.role,
+                        }.items()
+                        if value
+                    },
+                },
             )
         )
     return facts
@@ -94,15 +106,28 @@ def _heuristic_facts(chunk: DocumentChunk) -> list[ProfileFact]:
         for piece in pieces:
             if len(piece) < 6:
                 continue
+            category = _guess_category(piece)
+            metadata = {"fallback": True}
+            if (
+                category
+                in {
+                    FactCategory.PROJECT,
+                    FactCategory.COMPETITION,
+                    FactCategory.INTERNSHIP,
+                    FactCategory.EDUCATION,
+                }
+                and span.section
+            ):
+                metadata["experience_name"] = span.section
             facts.append(
                 ProfileFact(
-                    category=_guess_category(piece),
+                    category=category,
                     statement=piece[:800],
                     basis_type=BasisType.FACT,
                     confidence=0.68,
                     evidence_refs=[_evidence_ref(span)],
                     rationale="由资料原文直接抽取。",
-                    metadata={"fallback": True},
+                    metadata=metadata,
                 )
             )
     return facts[:100]

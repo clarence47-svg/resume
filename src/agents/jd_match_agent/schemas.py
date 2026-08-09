@@ -24,6 +24,14 @@ class JDAnalysisDraft(BaseModel):
     requirements: list[JDRequirementDraft] = Field(default_factory=list)
 
 
+class JobResearchDraft(BaseModel):
+    role_summary: str
+    core_capabilities: list[str] = Field(default_factory=list)
+    typical_responsibilities: list[str] = Field(default_factory=list)
+    common_tools: list[str] = Field(default_factory=list)
+    market_keywords: list[str] = Field(default_factory=list)
+
+
 class RequirementMatchDraft(BaseModel):
     requirement_id: str
     support_level: SupportLevel

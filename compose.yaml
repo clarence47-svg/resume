@@ -31,14 +31,42 @@ services:
       PROFILE_MODEL: ${PROFILE_MODEL:-gpt-4.1-mini}
       MATCH_MODEL: ${MATCH_MODEL:-}
       MATCH_WORKERS: ${MATCH_WORKERS:-1}
+      CAREER_WORKERS: ${CAREER_WORKERS:-1}
+      JOB_SEARCH_ENABLED: ${JOB_SEARCH_ENABLED:-true}
+      JOB_SEARCH_ENDPOINT: ${JOB_SEARCH_ENDPOINT:-http://www.baidu.com/s}
+      JOB_SEARCH_FALLBACK_ENDPOINT: ${JOB_SEARCH_FALLBACK_ENDPOINT:-https://www.bing.com/search}
+      JOB_SEARCH_MAX_RESULTS: ${JOB_SEARCH_MAX_RESULTS:-8}
+      JOB_SEARCH_TIMEOUT_SECONDS: ${JOB_SEARCH_TIMEOUT_SECONDS:-12}
       ALLOW_HEURISTIC_FALLBACK: ${ALLOW_HEURISTIC_FALLBACK:-true}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-}
+      CHROME_CDP_URL: ${CHROME_CDP_URL:-http://host.docker.internal:9222}
+      BROWSER_AUTOMATION_ENABLED: ${BROWSER_AUTOMATION_ENABLED:-false}
+      BROWSER_ACTION_TIMEOUT_SECONDS: ${BROWSER_ACTION_TIMEOUT_SECONDS:-30}
+      BOSS_DAILY_ACTION_LIMIT: ${BOSS_DAILY_ACTION_LIMIT:-10}
+      BOSS_ACTION_INTERVAL_MIN_SECONDS: ${BOSS_ACTION_INTERVAL_MIN_SECONDS:-90}
+      BOSS_ACTION_INTERVAL_MAX_SECONDS: ${BOSS_ACTION_INTERVAL_MAX_SECONDS:-180}
+      BOSS_DISCOVERY_MAX_JOBS: ${BOSS_DISCOVERY_MAX_JOBS:-10}
     volumes:
       - profile_data:/app/data
     ports:
       - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          ".venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     depends_on:
       postgres:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   streamlit_app:
     image: profile-agent-service:local
@@ -47,8 +75,21 @@ services:
       AGENT_URL: http://agent_service:8080
     ports:
       - "127.0.0.1:8501:8501"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          ".venv/bin/python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     depends_on:
-      - agent_service
+      agent_service:
+        condition: service_healthy
 
 volumes:
   postgres_data:

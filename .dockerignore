@@ -6,9 +6,11 @@ __pycache__
 data/uploads
 data/parsed
 data/exports
+data/jobs
+data/resumes
+data/applications
 data/*.db
 data/*.sqlite
 htmlcov
 dist
 build
-

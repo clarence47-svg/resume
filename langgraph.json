@@ -2,7 +2,11 @@
   "dependencies": ["."],
   "graphs": {
     "profile-agent": "./src/agents/profile_agent/graph.py:graph",
-    "jd-match-agent": "./src/agents/jd_match_agent/graph.py:graph"
+    "jd-match-agent": "./src/agents/jd_match_agent/graph.py:graph",
+    "job-discovery-agent": "./src/agents/job_discovery_agent/graph.py:graph",
+    "resume-builder-agent": "./src/agents/resume_builder_agent/graph.py:graph",
+    "application-agent": "./src/agents/application_agent/graph.py:graph",
+    "interview-agent": "./src/agents/interview_agent/graph.py:graph"
   },
   "env": ".env"
 }
